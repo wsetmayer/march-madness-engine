@@ -16,6 +16,7 @@ interface Game {
   status: string;
   venue: string;
   time: string;
+  date: string;
   isLive: boolean;
   isFinal: boolean;
   homeWinProb?: number | null;
@@ -53,26 +54,165 @@ function parsedGames(data: any): Game[] {
       home: {
         name: home?.team?.displayName || '',
         score: home?.score || '0',
-        seed: home?.curatedRank?.current?.toString() || '',
+        seed: (home?.curatedRank?.current && home.curatedRank.current > 0) ? home.curatedRank.current.toString() : '',
         logo: home?.team?.logo || '',
         color: home?.team?.color || '333333',
       },
       away: {
         name: away?.team?.displayName || '',
         score: away?.score || '0',
-        seed: away?.curatedRank?.current?.toString() || '',
+        seed: (away?.curatedRank?.current && away.curatedRank.current > 0) ? away.curatedRank.current.toString() : '',
         logo: away?.team?.logo || '',
         color: away?.team?.color || '333333',
       },
       status: detail,
       venue: comp.venue?.fullName || '',
       time: new Date(event.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+      date: event.date,
       isLive: status === 'STATUS_IN_PROGRESS' || status === 'STATUS_HALFTIME',
       isFinal: status === 'STATUS_FINAL',
       homeWinProb: comp.homeWinProbability ? Math.round(comp.homeWinProbability * 1000) / 10 : null,
       awayWinProb: comp.awayWinProbability ? Math.round(comp.awayWinProbability * 1000) / 10 : null,
     };
   });
+}
+
+function useCountdown(targetTime: string) {
+  const [timeLeft, setTimeLeft] = React.useState('');
+
+  React.useEffect(() => {
+    function calc() {
+      const diff = new Date(targetTime).getTime() - Date.now();
+      if (diff <= 0) { setTimeLeft('Starting soon'); return; }
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      if (h > 0) setTimeLeft(`${h}h ${m}m`);
+      else if (m > 0) setTimeLeft(`${m}m ${s}s`);
+      else setTimeLeft(`${s}s`);
+    }
+    calc();
+    const id = setInterval(calc, 1000);
+    return () => clearInterval(id);
+  }, [targetTime]);
+
+  return timeLeft;
+}
+
+function useLastUpdated() {
+  const [lastUpdated, setLastUpdated] = React.useState<Date>(new Date());
+  const [secondsAgo, setSecondsAgo] = React.useState(0);
+
+  const markUpdated = React.useCallback(() => {
+    setLastUpdated(new Date());
+    setSecondsAgo(0);
+  }, []);
+
+  React.useEffect(() => {
+    const id = setInterval(() => {
+      setSecondsAgo(Math.floor((Date.now() - lastUpdated.getTime()) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [lastUpdated]);
+
+  return { secondsAgo, markUpdated };
+}
+
+function MomentumMeter({ gameId }: { gameId: string }) {
+  const [data, setData] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    async function fetch_() {
+      try {
+        const res = await fetch(`/api/momentum?id=${gameId}`);
+        const json = await res.json();
+        setData(json);
+      } catch { }
+      setLoading(false);
+    }
+    fetch_();
+    const id = setInterval(fetch_, 60000);
+    return () => clearInterval(id);
+  }, [gameId]);
+
+  if (loading) return (
+    <div style={{ padding: '10px 0', fontSize: 11, color: '#555', fontStyle: 'italic' }}>
+      Loading momentum...
+    </div>
+  );
+
+  if (!data || !data.hasData) return (
+    <div style={{ padding: '10px 0', fontSize: 11, color: '#555' }}>
+      Not enough scoring data yet.
+    </div>
+  );
+
+  const { homeName, awayName, homeColor, awayColor, homePts, awayPts } = data;
+  const total = homePts + awayPts || 1;
+  const homeWidth = Math.round((homePts / total) * 100);
+  const awayWidth = 100 - homeWidth;
+  const leader = homePts > awayPts ? homeName : awayPts > homePts ? awayName : null;
+  const leaderPts = Math.max(homePts, awayPts);
+  const trailerPts = Math.min(homePts, awayPts);
+  const leaderColor = homePts >= awayPts ? homeColor : awayColor;
+
+  return (
+    <div style={{
+      marginTop: 10, padding: '12px 14px',
+      background: '#111', borderRadius: 10,
+      border: '1px solid #2a2a2a',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+        <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#ff6b35' }} />
+        <span style={{ fontSize: 10, fontWeight: 800, color: '#ff6b35', letterSpacing: '0.08em' }}>
+          MOMENTUM · LAST 5 MIN
+        </span>
+      </div>
+
+      {/* Bar */}
+      <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
+        <div style={{
+          width: `${awayWidth}%`,
+          background: `#${awayColor}`,
+          transition: 'width 0.8s ease',
+        }} />
+        <div style={{
+          width: `${homeWidth}%`,
+          background: `#${homeColor}`,
+          transition: 'width 0.8s ease',
+        }} />
+      </div>
+
+      {/* Labels */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: `#${awayColor}` }}>
+          {awayName} <span style={{ color: '#f0f0f0' }}>{awayPts}</span>
+        </span>
+        <span style={{ fontSize: 11, fontWeight: 700, color: `#${homeColor}` }}>
+          <span style={{ color: '#f0f0f0' }}>{homePts}</span> {homeName}
+        </span>
+      </div>
+
+      {/* Narrative */}
+      {leader && leaderPts > trailerPts && (
+        <div style={{ fontSize: 12, color: '#bbb', lineHeight: 1.5 }}>
+          <span style={{ color: `#${leaderColor}`, fontWeight: 700 }}>{leader}</span>
+          {' '}has outscored{' '}
+          <span style={{ fontWeight: 600 }}>
+            {homePts >= awayPts ? awayName : homeName}
+          </span>
+          {' '}<span style={{ color: '#f0f0f0', fontWeight: 700 }}>{leaderPts}–{trailerPts}</span>
+          {' '}in the last 5 minutes
+        </div>
+      )}
+      {(!leader || leaderPts === trailerPts) && (
+        <div style={{ fontSize: 12, color: '#bbb' }}>
+          Teams are even — <span style={{ color: '#f0f0f0', fontWeight: 700 }}>{homePts}–{awayPts}</span> in the last 5 minutes
+        </div>
+      )}
+    </div>
+  );
 }
 
 function scoreColor(score: number) {
@@ -195,6 +335,31 @@ function ScoreTicker({ games }: { games: Game[] }) {
   );
 }
 
+function UpcomingCountdown({ date, time }: { date: string; time: string }) {
+  const countdown = useCountdown(date);
+  const isImminent = countdown === 'Starting soon';
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 10,
+    }}>
+      <span style={{ fontSize: 11, color: '#666', fontWeight: 600 }}>{time}</span>
+      <span style={{ fontSize: 10, color: '#444' }}>·</span>
+      <span style={{
+        fontSize: 11,
+        fontWeight: 700,
+        color: isImminent ? '#22c55e' : '#ff6b35',
+        letterSpacing: '0.03em',
+      }}>
+        {isImminent ? '🟢 Starting soon' : `⏱ ${countdown}`}
+      </span>
+    </div>
+  );
+}
+
 function GameCard({ game }: { game: Game }) {
   const [narrative, setNarrative] = useState('');
   const [narrativeLoading, setNarrativeLoading] = useState(false);
@@ -280,7 +445,7 @@ function GameCard({ game }: { game: Game }) {
         <div style={{ fontSize: 11, color: '#666', marginBottom: 10, letterSpacing: '0.08em', fontWeight: 600 }}>FINAL</div>
       )}
       {!game.isLive && !game.isFinal && (
-        <div style={{ fontSize: 11, color: '#666', marginBottom: 10 }}>{game.time}</div>
+        <UpcomingCountdown date={game.date} time={game.time} />
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 12, marginBottom: 12 }}>
@@ -289,7 +454,7 @@ function GameCard({ game }: { game: Game }) {
             <img src={game.away.logo} alt="" style={{ width: 32, height: 32, objectFit: 'contain' }} onError={(e) => (e.currentTarget.style.display = 'none')} />
           </div>
           <div>
-            {game.away.seed && <div style={{ fontSize: 10, color: '#666', marginBottom: 2 }}>#{game.away.seed} seed</div>}
+            {game.away.seed && <div style={{ fontSize: 10, color: '#888', marginBottom: 2 }}>#{game.away.seed} seed</div>}
             <div style={{ fontSize: 13, fontWeight: 600, color: '#f0f0f0', lineHeight: 1.3 }}>{game.away.name}</div>
           </div>
         </div>
@@ -320,7 +485,7 @@ function GameCard({ game }: { game: Game }) {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'flex-end' }}>
           <div style={{ textAlign: 'right' }}>
-            {game.home.seed && <div style={{ fontSize: 10, color: '#666', marginBottom: 2 }}>#{game.home.seed} seed</div>}
+            {game.home.seed && <div style={{ fontSize: 10, color: '#888', marginBottom: 2 }}>#{game.home.seed} seed</div>}
             <div style={{ fontSize: 13, fontWeight: 600, color: '#f0f0f0', lineHeight: 1.3 }}>{game.home.name}</div>
           </div>
           <div style={{ width: 40, height: 40, borderRadius: 8, background: `#${game.home.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -329,7 +494,7 @@ function GameCard({ game }: { game: Game }) {
         </div>
       </div>
 
-      {game.venue && <div style={{ fontSize: 11, color: '#444', marginBottom: 12 }}>📍 {game.venue}</div>}
+      {game.venue && <div style={{ fontSize: 11, color: '#666', marginBottom: 12 }}>📍 {game.venue}</div>}
 
       <div style={{ display: 'flex', gap: 8 }}>
         <button onClick={toggleBoxScore} style={{
@@ -436,6 +601,8 @@ function GameCard({ game }: { game: Game }) {
           )}
         </div>
       )}
+
+      {game.isLive && <MomentumMeter gameId={game.id} />}
 
       {narrativeExpanded && (
         <div style={{
@@ -613,11 +780,42 @@ function NILModal({ player, onClose }: { player: Player; onClose: () => void }) 
           {loading ? (
             <div style={{ color: '#555', fontSize: 13, fontStyle: 'italic' }}>Claude is generating NIL valuation...</div>
           ) : (
-            <div style={{ fontSize: 13, color: '#bbb', lineHeight: 1.9, whiteSpace: 'pre-wrap' }}>{nilData}</div>
+            <div style={{ fontSize: 13, lineHeight: 1.9 }}>
+              {nilData.split('\n').map((line, i) => {
+                const parsed = line.replace(/\*\*(.+?)\*\*/g, '<strong style="color:#f0f0f0;font-weight:700">$1</strong>');
+                const isHeader = /^[📱💰🎯🚀📖⭐🏀]/.test(line);
+                if (!line.trim()) return <div key={i} style={{ height: 8 }} />;
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      marginBottom: isHeader ? 6 : 2,
+                      color: isHeader ? '#f0f0f0' : '#bbb',
+                      fontWeight: isHeader ? 700 : 400,
+                    }}
+                    dangerouslySetInnerHTML={{ __html: parsed }}
+                  />
+                );
+              })}
+            </div>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+function BracketCountdown({ date }: { date: string }) {
+  const countdown = useCountdown(date);
+  const isImminent = countdown === 'Starting soon';
+  return (
+    <span style={{
+      fontSize: 9,
+      fontWeight: 700,
+      color: isImminent ? '#22c55e' : '#ff6b35',
+    }}>
+      {isImminent ? '🟢 Soon' : `⏱ ${countdown}`}
+    </span>
   );
 }
 
@@ -673,7 +871,7 @@ function BracketGame({ game }: { game: any }) {
             </div>
           )}
           {game.isFinal && <span style={{ fontSize: 9, color: '#444', fontWeight: 600 }}>FINAL</span>}
-          {!game.isLive && !game.isFinal && <span style={{ fontSize: 9, color: '#555' }}>{new Date(game.date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })}</span>}
+          {!game.isLive && !game.isFinal && <BracketCountdown date={game.date} />}
         </div>
       </div>
     </div>
@@ -748,19 +946,19 @@ function BracketTab() {
       <div style={{ display: 'flex', gap: 10, marginBottom: '1rem', flexWrap: 'wrap' }}>
         <div style={{ background: '#1a1a1a', borderRadius: 10, padding: '10px 16px', border: '1px solid #2a2a2a', textAlign: 'center' }}>
           <div style={{ fontSize: 20, fontWeight: 800, color: '#22c55e' }}>{finalCount}</div>
-          <div style={{ fontSize: 10, color: '#555', letterSpacing: '0.06em' }}>COMPLETED</div>
+          <div style={{ fontSize: 10, color: '#777', letterSpacing: '0.06em' }}>COMPLETED</div>
         </div>
         <div style={{ background: '#1a1a1a', borderRadius: 10, padding: '10px 16px', border: '1px solid #2a2a2a', textAlign: 'center' }}>
           <div style={{ fontSize: 20, fontWeight: 800, color: '#ff3b30' }}>{liveCount}</div>
-          <div style={{ fontSize: 10, color: '#555', letterSpacing: '0.06em' }}>LIVE NOW</div>
+          <div style={{ fontSize: 10, color: '#777', letterSpacing: '0.06em' }}>LIVE NOW</div>
         </div>
         <div style={{ background: '#1a1a1a', borderRadius: 10, padding: '10px 16px', border: '1px solid #2a2a2a', textAlign: 'center' }}>
           <div style={{ fontSize: 20, fontWeight: 800, color: '#ff6b35' }}>{upsetCount}</div>
-          <div style={{ fontSize: 10, color: '#555', letterSpacing: '0.06em' }}>UPSETS</div>
+          <div style={{ fontSize: 10, color: '#777', letterSpacing: '0.06em' }}>UPSETS</div>
         </div>
         <div style={{ background: '#1a1a1a', borderRadius: 10, padding: '10px 16px', border: '1px solid #2a2a2a', textAlign: 'center' }}>
           <div style={{ fontSize: 20, fontWeight: 800, color: '#f0f0f0' }}>{roundAllGames.length}</div>
-          <div style={{ fontSize: 10, color: '#555', letterSpacing: '0.06em' }}>TOTAL GAMES</div>
+          <div style={{ fontSize: 10, color: '#777', letterSpacing: '0.06em' }}>TOTAL GAMES</div>
         </div>
       </div>
 
@@ -842,14 +1040,12 @@ function BracketTab() {
                     <span style={{ fontSize: 9, color: '#ff3b30', fontWeight: 700 }}>{game.status}</span>
                   </div>
                 )}
-                {game.isFinal && !isUpset && <span style={{ fontSize: 9, color: '#444' }}>FINAL</span>}
+                {game.isFinal && !isUpset && <span style={{ fontSize: 9, color: '#666' }}>FINAL</span>}
                 {!game.isLive && !game.isFinal && (
-                  <span style={{ fontSize: 9, color: '#555' }}>
-                    {new Date(game.date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })}
-                  </span>
+                  <BracketCountdown date={game.date} />
                 )}
                 {(game.isFinal || game.isLive) && (
-                  <span style={{ fontSize: 9, color: '#555' }}>tap for box score</span>
+                  <span style={{ fontSize: 9, color: '#777' }}>tap for box score</span>
                 )}
               </div>
             </div>
@@ -1377,13 +1573,20 @@ export default function Home() {
   const [gamesLoading, setGamesLoading] = useState(true);
   const [playersLoading, setPlayersLoading] = useState(true);
   
-  const [activeTab, setActiveTab] = useState<'games' | 'players' | 'bracket' | 'upsets' | 'leaders'>('games');const [gameFilter, setGameFilter] = useState<'all' | 'live' | 'final' | 'upcoming'>('all');
+  const [activeTab, setActiveTab] = useState<'games' | 'players' | 'bracket' | 'upsets' | 'leaders'>('games');
+  const [gameFilter, setGameFilter] = useState<'all' | 'live' | 'final' | 'upcoming'>('all');
   const [nilPlayer, setNilPlayer] = useState<Player | null>(null);
   const [gameSearch, setGameSearch] = useState('');
   const [playerSearch, setPlayerSearch] = useState('');
+  const [activeDateFilter, setActiveDateFilter] = useState<string>(
+    new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'America/New_York' })
+  );
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { secondsAgo, markUpdated } = useLastUpdated();
 
-  useEffect(() => {
-    async function fetchAll() {
+  async function fetchAll(isManual = false) {
+    if (isManual) setIsRefreshing(true);
+    try {
       const [gamesRes, playersRes] = await Promise.all([
         fetch('/api/games'),
         fetch('/api/players')
@@ -1392,24 +1595,18 @@ export default function Home() {
       const playersData = await playersRes.json();
       setGames(parsedGames(gamesData));
       setPlayers(playersData.players || []);
-      setGamesLoading(false);
-      setPlayersLoading(false);
+      markUpdated();
+    } catch (e) {
+      console.log('Refresh failed, will retry');
     }
+    setGamesLoading(false);
+    setPlayersLoading(false);
+    if (isManual) setIsRefreshing(false);
+  }
+
+  useEffect(() => {
     fetchAll();
-    const interval = setInterval(async () => {
-      try {
-        const [gamesRes, playersRes] = await Promise.all([
-          fetch('/api/games'),
-          fetch('/api/players')
-        ]);
-        const gamesData = await gamesRes.json();
-        const playersData = await playersRes.json();
-        setGames(parsedGames(gamesData));
-        setPlayers(playersData.players || []);
-      } catch (e) {
-        console.log('Refresh failed, will retry');
-      }
-    }, 60000);
+    const interval = setInterval(() => fetchAll(), 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -1473,13 +1670,41 @@ export default function Home() {
             borderRadius: 6, letterSpacing: '0.05em'
           }}>STORY ENGINE</span>
         </div>
-        <p style={{ fontSize: 12, color: '#555' }}>Live games · AI narratives · Cinderella tracker · NIL spotlight</p>
-        {liveCount > 0 && (
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8, background: '#22c55e18', padding: '4px 10px', borderRadius: 20, border: '1px solid #22c55e33' }}>
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', animation: 'pulse 1.5s infinite' }} />
-            <span style={{ fontSize: 11, color: '#22c55e', fontWeight: 700 }}>{liveCount} game{liveCount > 1 ? 's' : ''} live now</span>
+        <p style={{ fontSize: 12, color: '#777' }}>Live games · AI narratives · Cinderella tracker · NIL spotlight</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+          {liveCount > 0 && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#22c55e18', padding: '4px 10px', borderRadius: 20, border: '1px solid #22c55e33' }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', animation: 'pulse 1.5s infinite' }} />
+              <span style={{ fontSize: 11, color: '#22c55e', fontWeight: 700 }}>{liveCount} game{liveCount > 1 ? 's' : ''} live now</span>
+            </div>
+          )}
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#555', animation: 'pulse 2s infinite' }} />
+            <span style={{ fontSize: 11, color: '#666', fontWeight: 600 }}>
+              {secondsAgo < 5 ? 'Just updated' : `Updated ${secondsAgo}s ago`}
+            </span>
+            <button
+              onClick={() => fetchAll(true)}
+              disabled={isRefreshing}
+              style={{
+                background: 'transparent',
+                border: '1px solid #2a2a2a',
+                borderRadius: 12,
+                padding: '2px 8px',
+                fontSize: 10,
+                fontWeight: 700,
+                color: isRefreshing ? '#333' : '#555',
+                cursor: isRefreshing ? 'default' : 'pointer',
+                letterSpacing: '0.04em',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { if (!isRefreshing) { e.currentTarget.style.borderColor = '#ff6b35'; e.currentTarget.style.color = '#ff6b35'; }}}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2a2a'; e.currentTarget.style.color = isRefreshing ? '#333' : '#555'; }}
+            >
+              {isRefreshing ? '↻ ...' : '↻ Refresh'}
+            </button>
           </div>
-        )}
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 4, marginBottom: '1.25rem', background: '#1a1a1a', borderRadius: 12, padding: 4, border: '1px solid #2a2a2a' }}>
@@ -1488,7 +1713,7 @@ export default function Home() {
             flex: 1, padding: '10px 8px', fontSize: 13, fontWeight: 700,
             background: activeTab === tab ? '#ff6b35' : 'transparent',
             border: 'none', borderRadius: 9,
-            color: activeTab === tab ? '#fff' : '#555',
+            color: activeTab === tab ? '#fff' : '#888',
             cursor: 'pointer', transition: 'all 0.15s',
             letterSpacing: '0.02em'
           }}>
@@ -1524,7 +1749,164 @@ export default function Home() {
             ))}
           </div>
           {gamesLoading && <div style={{ textAlign: 'center', padding: '3rem', color: '#555' }}>Loading games...</div>}
-          {filteredGames.map(game => <GameCard key={game.id} game={game} />)}
+          {(() => {
+            // Build all groups first
+            const allGroups: { label: string; dateKey: string; games: typeof filteredGames }[] = [];
+            filteredGames.forEach(game => {
+              const dateKey = new Date(game.date).toLocaleDateString('en-US', {
+                month: 'long', day: 'numeric', timeZone: 'America/New_York'
+              });
+              const existing = allGroups.find(g => g.dateKey === dateKey);
+              if (existing) existing.games.push(game);
+              else allGroups.push({ label: dateKey, dateKey, games: [game] });
+            });
+
+            // Sort groups by date ascending
+            allGroups.sort((a, b) => {
+              const aDate = filteredGames.find(g =>
+                new Date(g.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'America/New_York' }) === a.dateKey
+              )?.date || '';
+              const bDate = filteredGames.find(g =>
+                new Date(g.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'America/New_York' }) === b.dateKey
+              )?.date || '';
+              return new Date(aDate).getTime() - new Date(bDate).getTime();
+            });
+
+            // Sort within each group: live first, then upcoming by time, then finals
+            allGroups.forEach(group => {
+              group.games.sort((a, b) => {
+                if (a.isLive && !b.isLive) return -1;
+                if (!a.isLive && b.isLive) return 1;
+                if (!a.isFinal && b.isFinal) return -1;
+                if (a.isFinal && !b.isFinal) return 1;
+                if (a.isLive && b.isLive) {
+                  const parseTime = (s: string) => {
+                    const match = s.match(/(\d+):(\d+)/);
+                    if (!match) return 999;
+                    return parseInt(match[1]) * 60 + parseInt(match[2]);
+                  };
+                  const aHalf = a.status.includes('2nd') ? 0 : 1;
+                  const bHalf = b.status.includes('2nd') ? 0 : 1;
+                  if (aHalf !== bHalf) return aHalf - bHalf;
+                  return parseTime(a.status) - parseTime(b.status);
+                }
+                return new Date(a.date).getTime() - new Date(b.date).getTime();
+              });
+            });
+
+            // Date filter pills
+            const visibleGroups = activeDateFilter === 'all'
+              ? allGroups
+              : allGroups.filter(g => g.dateKey === activeDateFilter);
+
+            return (
+              <>
+                {/* ESPN-style date selector */}
+                {allGroups.length > 1 && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'stretch',
+                    background: '#1a1a1a',
+                    border: '1px solid #2a2a2a',
+                    borderRadius: 12,
+                    overflow: 'hidden',
+                    marginBottom: 16,
+                    height: 76,
+                  }}>
+                    {allGroups.map((group, i) => {
+                      const d = new Date(
+                        filteredGames.find(g =>
+                          new Date(g.date).toLocaleDateString('en-US', {
+                            month: 'long', day: 'numeric', timeZone: 'America/New_York'
+                          }) === group.dateKey
+                        )?.date || ''
+                      );
+                      const dayName = d.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/New_York' }).toUpperCase();
+                      const monthDay = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).toUpperCase();
+                      const isActive = activeDateFilter === group.dateKey;
+                      const liveInGroup = group.games.filter(g => g.isLive).length;
+                      return (
+                        <button
+                          key={group.dateKey}
+                          onClick={() => setActiveDateFilter(group.dateKey)}
+                          style={{
+                            flex: '1 1 0',
+                            width: 0,
+                            minWidth: 0,
+                            padding: '12px 8px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 2,
+                            background: isActive ? '#ff6b35' : 'transparent',
+                            border: 'none',
+                            borderRight: i < allGroups.length - 1 ? '1px solid #2a2a2a' : 'none',
+                            cursor: 'pointer',
+                            transition: 'background 0.15s',
+                            position: 'relative',
+                          }}>
+                          <span style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: isActive ? '#fff' : '#666',
+                            letterSpacing: '0.06em',
+                            lineHeight: '1',
+                            display: 'block',
+                          }}>
+                            {dayName}
+                          </span>
+                          <span style={{
+                            fontSize: 13,
+                            fontWeight: 800,
+                            color: isActive ? '#fff' : '#f0f0f0',
+                            letterSpacing: '0.02em',
+                            lineHeight: '1',
+                            display: 'block',
+                          }}>
+                            {monthDay}
+                          </span>
+                          {liveInGroup > 0 && (
+                            <div style={{
+                              position: 'absolute', top: 6, right: 8,
+                              width: 6, height: 6, borderRadius: '50%',
+                              background: isActive ? '#fff' : '#22c55e',
+                              animation: 'pulse 1.5s infinite',
+                            }} />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Game groups — no header when filtered to single date */}
+                {visibleGroups.map((group, gi) => (
+                  <div key={group.dateKey}>
+                    {visibleGroups.length > 1 && (
+                      <div style={{
+                        fontSize: 12, fontWeight: 800, color: '#f0f0f0',
+                        letterSpacing: '0.06em', marginBottom: 12,
+                        marginTop: gi === 0 ? 0 : 20,
+                        paddingBottom: 8, paddingTop: 8, paddingLeft: 12,
+                        borderBottom: '1px solid #2a2a2a',
+                        borderLeft: '3px solid #ff6b35',
+                        background: '#1a1a1a',
+                        borderRadius: 6,
+                        textTransform: 'uppercase',
+                      }}>
+                        📅 {group.label}
+                        <span style={{ fontSize: 10, color: '#555', fontWeight: 600, marginLeft: 8 }}>
+                          {group.games.length} game{group.games.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    )}
+                    {group.games.map(game => <GameCard key={game.id} game={game} />)}
+                  </div>
+                ))}
+              </>
+            );
+          })()}
         </>
       )}
 
