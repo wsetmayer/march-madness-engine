@@ -14,41 +14,68 @@ export async function GET(request: Request) {
     const data = await res.json();
 
     const boxscore = data?.boxscore?.players || [];
-    const teams = boxscore.map((teamBox: any) => {
+    const teamStatsRaw = data?.boxscore?.teams || [];
+
+    const teams = boxscore.map((teamBox: any, ti: number) => {
       const labels = teamBox.statistics?.[0]?.labels || [];
       const athletes = teamBox.statistics?.[0]?.athletes || [];
 
+      const getStat = (stats: any[], label: string) => {
+        const idx = labels.indexOf(label);
+        return idx >= 0 ? stats[idx] || '0' : '0';
+      };
+
       const players = athletes
-        .filter((a: any) => a.stats?.length > 0 && a.stats[0] !== '0:00' && a.stats[0] !== '0')
-        .map((a: any) => {
-          const getStat = (label: string) => {
-            const idx = labels.indexOf(label);
-            return idx >= 0 ? a.stats[idx] || '0' : '0';
-          };
-          return {
-            name: a.athlete?.shortName || a.athlete?.displayName || '',
-            headshot: a.athlete?.headshot?.href || '',
-            position: a.athlete?.position?.abbreviation || '',
-            starter: a.starter || false,
-            min: getStat('MIN'),
-            pts: getStat('PTS'),
-            reb: getStat('REB'),
-            ast: getStat('AST'),
-            stl: getStat('STL'),
-            blk: getStat('BLK'),
-            fg: getStat('FG'),
-            threes: getStat('3PT'),
-            ft: getStat('FT'),
-            to: getStat('TO'),
-          };
-        })
+        .filter((a: any) => a.stats?.length > 0 && a.stats[0] !== '0:00')
+        .map((a: any) => ({
+          name: a.athlete?.shortName || a.athlete?.displayName || '',
+          headshot: a.athlete?.headshot?.href || '',
+          position: a.athlete?.position?.abbreviation || '',
+          starter: a.starter || false,
+          min: getStat(a.stats, 'MIN'),
+          pts: getStat(a.stats, 'PTS'),
+          reb: getStat(a.stats, 'REB'),
+          ast: getStat(a.stats, 'AST'),
+          stl: getStat(a.stats, 'STL'),
+          blk: getStat(a.stats, 'BLK'),
+          fg: getStat(a.stats, 'FG'),
+          threes: getStat(a.stats, '3PT'),
+          ft: getStat(a.stats, 'FT'),
+          to: getStat(a.stats, 'TO'),
+        }))
         .sort((a: any, b: any) => parseInt(b.pts) - parseInt(a.pts));
+
+      // Team totals from boxscore
+      const teamStatData = teamStatsRaw[ti];
+      const statsList = teamStatData?.statistics || [];
+
+      const getTeamStat = (name: string) => {
+        const s = statsList.find((x: any) => x.name === name || x.abbreviation === name);
+        return s?.displayValue || '-';
+      };
 
       return {
         team: teamBox.team?.displayName || '',
         logo: teamBox.team?.logo || '',
         color: teamBox.team?.color || '333333',
         players,
+        totals: {
+          fg: getTeamStat('fieldGoals'),
+          fgPct: getTeamStat('fieldGoalPct'),
+          threes: getTeamStat('threePointFieldGoals'),
+          threePct: getTeamStat('threePointFieldGoalPct'),
+          ft: getTeamStat('freeThrows'),
+          ftPct: getTeamStat('freeThrowPct'),
+          reb: getTeamStat('totalRebounds'),
+          oreb: getTeamStat('offensiveRebounds'),
+          dreb: getTeamStat('defensiveRebounds'),
+          ast: getTeamStat('assists'),
+          to: getTeamStat('turnovers'),
+          stl: getTeamStat('steals'),
+          blk: getTeamStat('blocks'),
+          pf: getTeamStat('fouls'),
+          pts: getTeamStat('points'),
+        }
       };
     });
 
