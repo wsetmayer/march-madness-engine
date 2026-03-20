@@ -1171,13 +1171,213 @@ function UpsetHistoryTab() {
 }
 
 
+function LeadersTab() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeCategory, setActiveCategory] = useState('topGames');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 15;
+
+  
+
+  useEffect(() => {
+    async function fetchLeaders() {
+      try {
+        const res = await fetch('/api/leaders');
+        const json = await res.json();
+        setData(json);
+      } catch { }
+      setLoading(false);
+    }
+    fetchLeaders();
+  }, []);
+
+  const categories = [
+    { key: 'topGames', label: '🔥 Top Games', statKey: 'gameScore', statLabel: 'SCORE', isTopGame: true },
+    { key: 'scoring', label: '🏀 Scoring', statKey: 'ppg', statLabel: 'PPG' },
+    { key: 'rebounds', label: '💪 Rebounds', statKey: 'rpg', statLabel: 'RPG' },
+    { key: 'assists', label: '🎯 Assists', statKey: 'apg', statLabel: 'APG' },
+    { key: 'steals', label: '🔒 Steals', statKey: 'spg', statLabel: 'SPG' },
+    { key: 'blocks', label: '🛡 Blocks', statKey: 'bpg', statLabel: 'BPG' },
+  ];
+
+  if (loading) return <div style={{ textAlign: 'center', padding: '3rem', color: '#555' }}>Loading leaders...</div>;
+  if (!data) return <div style={{ textAlign: 'center', padding: '3rem', color: '#555' }}>No data available.</div>;
+
+  const activeCat = categories.find(c => c.key === activeCategory)!;
+  const allPlayers = (data[activeCategory] || []).filter((p: any) =>
+    search === '' ? true :
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    p.team.toLowerCase().includes(search.toLowerCase())
+  );
+  const totalPages = Math.ceil(allPlayers.length / PAGE_SIZE);
+  const players = allPlayers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+        {categories.map(c => (
+          <button key={c.key} onClick={() => { setActiveCategory(c.key); setSearch(''); setPage(1); }} style={{
+            padding: '6px 12px', fontSize: 11, fontWeight: 700,
+            borderRadius: 20, border: '1px solid',
+            borderColor: activeCategory === c.key ? '#ff6b35' : '#2a2a2a',
+            background: activeCategory === c.key ? '#ff6b35' : 'transparent',
+            color: activeCategory === c.key ? '#fff' : '#666', cursor: 'pointer'
+          }}>{c.label}</button>
+        ))}
+      </div>
+
+      <input
+        value={search}
+        onChange={e => { setSearch(e.target.value); setPage(1); }}
+        placeholder="Search players or teams..."
+        style={{
+          width: '100%', fontSize: 14, padding: '11px 16px',
+          border: '1px solid #2a2a2a', borderRadius: 10,
+          background: '#1a1a1a', color: '#f0f0f0',
+          marginBottom: 12, outline: 'none'
+        }}
+      />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {players.map((p: any, i: number) => {
+          const statValue = activeCat.isTopGame ? (p.topGame?.gameScore ?? p.topGame?.pts ?? 0) : p[activeCat.statKey];
+          if (i === 0) console.log('top player topGame:', p.topGame);
+          const isTop3 = i < 3;
+
+          return (
+            <div key={p.id} style={{
+              background: '#1a1a1a',
+              border: `1px solid ${isTop3 ? '#ff6b3533' : '#2a2a2a'}`,
+              borderRadius: 12,
+              padding: '12px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              borderLeft: isTop3 ? `4px solid ${i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : '#CD7F32'}` : '4px solid #2a2a2a',
+            }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : '#444', width: 24, textAlign: 'center', flexShrink: 0 }}>
+                {i + 1}
+              </div>
+
+              {p.headshot ? (
+                <img src={p.headshot} alt="" style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+                  onError={(e) => (e.currentTarget.style.display = 'none')} />
+              ) : (
+                <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#2a2a2a', flexShrink: 0 }} />
+              )}
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#f0f0f0', marginBottom: 2 }}>{p.shortName}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {p.teamLogo && <img src={p.teamLogo} alt="" style={{ width: 14, height: 14, objectFit: 'contain' }} onError={(e) => (e.currentTarget.style.display = 'none')} />}
+                  <span style={{ fontSize: 11, color: '#666' }}>#{p.seed} {p.team}</span>
+                </div>
+                {activeCat.isTopGame && (
+                  <div style={{ fontSize: 11, color: '#555', marginTop: 3 }}>
+                    {p.topGame.pts}pts · {p.topGame.reb}reb · {p.topGame.ast}ast · {p.topGame.fg} FG · vs {p.topGame.opponent}
+                  </div>
+                )}
+                {!activeCat.isTopGame && (
+                  <div style={{ fontSize: 11, color: '#555', marginTop: 3 }}>
+                    {p.games} game{p.games > 1 ? 's' : ''} · {p.ppg} PPG · {p.rpg} RPG · {p.apg} APG
+                  </div>
+                )}
+              </div>
+
+              {activeCat.isTopGame ? (() => {
+                const score = p.topGame.gameScore;
+                const color = (() => {
+                  if (score <= 1) return '#ef4444';
+                  if (score <= 5) {
+                    const t = (score - 1) / 4;
+                    const r = Math.round(239 + (255 - 239) * t);
+                    const g = Math.round(68 + (107 - 68) * t);
+                    const b = Math.round(68 + (53 - 68) * t);
+                    return `rgb(${r},${g},${b})`;
+                  }
+                  const t = (score - 5) / 5;
+                  const r = Math.round(255 - (255 - 34) * t);
+                  const g = Math.round(107 + (197 - 107) * t);
+                  const b = Math.round(53 + (94 - 53) * t);
+                  return `rgb(${r},${g},${b})`;
+                })();
+                const radius = 22;
+                const circumference = 2 * Math.PI * radius;
+                const progress = (score / 10) * circumference;
+                return (
+                  <div style={{ position: 'relative', width: 56, height: 56, flexShrink: 0 }}>
+                    <svg width="56" height="56" style={{ transform: 'rotate(-90deg)' }}>
+                      <circle cx="28" cy="28" r={radius} fill="none" stroke="#2a2a2a" strokeWidth="3" />
+                      <circle cx="28" cy="28" r={radius} fill="none" stroke={color} strokeWidth="3"
+                        strokeDasharray={`${progress} ${circumference}`} strokeLinecap="round" />
+                    </svg>
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
+                      <span style={{ fontSize: 14, fontWeight: 800, color, lineHeight: 1 }}>{score}</span>
+                      <span style={{ fontSize: 8, color: '#555', letterSpacing: '0.05em' }}>SCORE</span>
+                    </div>
+                  </div>
+                );
+              })() : (
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: isTop3 ? '#f0f0f0' : '#888' }}>
+                    {p[activeCat.statKey]}
+                  </div>
+                  <div style={{ fontSize: 10, color: '#555', fontWeight: 600 }}>{activeCat.statLabel}</div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 16 }}>
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            style={{
+              padding: '6px 14px', fontSize: 12, fontWeight: 600,
+              background: 'transparent', border: '1px solid #2a2a2a',
+              borderRadius: 8, color: page === 1 ? '#333' : '#888',
+              cursor: page === 1 ? 'default' : 'pointer'
+            }}>← Prev</button>
+
+          <div style={{ display: 'flex', gap: 4 }}>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+              <button key={n} onClick={() => setPage(n)} style={{
+                width: 32, height: 32, fontSize: 12, fontWeight: 700,
+                background: page === n ? '#ff6b35' : 'transparent',
+                border: `1px solid ${page === n ? '#ff6b35' : '#2a2a2a'}`,
+                borderRadius: 8, color: page === n ? '#fff' : '#666',
+                cursor: 'pointer'
+              }}>{n}</button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            style={{
+              padding: '6px 14px', fontSize: 12, fontWeight: 600,
+              background: 'transparent', border: '1px solid #2a2a2a',
+              borderRadius: 8, color: page === totalPages ? '#333' : '#888',
+              cursor: page === totalPages ? 'default' : 'pointer'
+            }}>Next →</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 export default function Home() {
   const [games, setGames] = useState<Game[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [gamesLoading, setGamesLoading] = useState(true);
   const [playersLoading, setPlayersLoading] = useState(true);
   
-  const [activeTab, setActiveTab] = useState<'games' | 'players' | 'bracket' | 'upsets'>('games');const [gameFilter, setGameFilter] = useState<'all' | 'live' | 'final' | 'upcoming'>('all');
+  const [activeTab, setActiveTab] = useState<'games' | 'players' | 'bracket' | 'upsets' | 'leaders'>('games');const [gameFilter, setGameFilter] = useState<'all' | 'live' | 'final' | 'upcoming'>('all');
   const [nilPlayer, setNilPlayer] = useState<Player | null>(null);
   const [gameSearch, setGameSearch] = useState('');
   const [playerSearch, setPlayerSearch] = useState('');
@@ -1283,7 +1483,7 @@ export default function Home() {
       </div>
 
       <div style={{ display: 'flex', gap: 4, marginBottom: '1.25rem', background: '#1a1a1a', borderRadius: 12, padding: 4, border: '1px solid #2a2a2a' }}>
-        {(['games', 'players', 'bracket', 'upsets'] as const).map(tab => (
+        {(['games', 'players', 'bracket', 'upsets', 'leaders'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)} style={{
             flex: 1, padding: '10px 8px', fontSize: 13, fontWeight: 700,
             background: activeTab === tab ? '#ff6b35' : 'transparent',
@@ -1292,7 +1492,7 @@ export default function Home() {
             cursor: 'pointer', transition: 'all 0.15s',
             letterSpacing: '0.02em'
           }}>
-            {tab === 'games' ? '🏀 Live' : tab === 'players' ? '⭐ Cinderella' : tab === 'bracket' ? '🗓 Bracket' : '⚡ Upsets'}
+            {tab === 'games' ? '🏀 Live' : tab === 'players' ? '⭐ Cinderella' : tab === 'bracket' ? '🗓 Bracket' : tab === 'upsets' ? '⚡ Upsets' : '🏆 Leaders'}
           </button>
         ))}
       </div>
@@ -1360,6 +1560,7 @@ export default function Home() {
       </div>
       {activeTab === 'bracket' && <BracketTab />}
       {activeTab === 'upsets' && <UpsetHistoryTab />}
+      {activeTab === 'leaders' && <LeadersTab />}
       {nilPlayer && <NILModal player={nilPlayer} onClose={() => setNilPlayer(null)} />}
     </main>
   );
