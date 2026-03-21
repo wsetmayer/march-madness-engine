@@ -136,79 +136,52 @@ function MomentumMeter({ gameId }: { gameId: string }) {
     return () => clearInterval(id);
   }, [gameId]);
 
-  if (loading) return (
-    <div style={{ padding: '10px 0', fontSize: 11, color: '#555', fontStyle: 'italic' }}>
-      Loading momentum...
-    </div>
-  );
-
-  if (!data || !data.hasData) return (
-    <div style={{ padding: '10px 0', fontSize: 11, color: '#555' }}>
-      Not enough scoring data yet.
-    </div>
-  );
+  if (loading || !data || !data.hasData) return null;
 
   const { homeName, awayName, homeColor, awayColor, homePts, awayPts } = data;
   const total = homePts + awayPts || 1;
   const homeWidth = Math.round((homePts / total) * 100);
   const awayWidth = 100 - homeWidth;
-  const leader = homePts > awayPts ? homeName : awayPts > homePts ? awayName : null;
+  const diff = Math.abs(homePts - awayPts);
+  const isRun = diff >= 7;
+  const leader = homePts > awayPts ? homeName : awayName;
+  const trailer = homePts > awayPts ? awayName : homeName;
   const leaderPts = Math.max(homePts, awayPts);
   const trailerPts = Math.min(homePts, awayPts);
-  const leaderColor = homePts >= awayPts ? homeColor : awayColor;
+  const leaderColor = homePts > awayPts ? homeColor : awayColor;
 
   return (
     <div style={{
-      marginTop: 10, padding: '12px 14px',
-      background: '#111', borderRadius: 10,
-      border: '1px solid #2a2a2a',
+      marginTop: 10, padding: '10px 0',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-        <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#ff6b35' }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+        <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#ff6b35', animation: 'pulse 1.5s infinite' }} />
         <span style={{ fontSize: 10, fontWeight: 800, color: '#ff6b35', letterSpacing: '0.08em' }}>
           MOMENTUM · LAST 5 MIN
         </span>
       </div>
 
       {/* Bar */}
-      <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
-        <div style={{
-          width: `${awayWidth}%`,
-          background: `#${awayColor}`,
-          transition: 'width 0.8s ease',
-        }} />
-        <div style={{
-          width: `${homeWidth}%`,
-          background: `#${homeColor}`,
-          transition: 'width 0.8s ease',
-        }} />
+      <div style={{ display: 'flex', height: 6, borderRadius: 4, overflow: 'hidden', marginBottom: 4 }}>
+        <div style={{ width: `${awayWidth}%`, background: `#${awayColor}`, transition: 'width 0.8s ease' }} />
+        <div style={{ width: `${homeWidth}%`, background: `#${homeColor}`, transition: 'width 0.8s ease' }} />
       </div>
 
-      {/* Labels */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: `#${awayColor}` }}>
-          {awayName} <span style={{ color: '#f0f0f0' }}>{awayPts}</span>
-        </span>
-        <span style={{ fontSize: 11, fontWeight: 700, color: `#${homeColor}` }}>
-          <span style={{ color: '#f0f0f0' }}>{homePts}</span> {homeName}
-        </span>
+      {/* Percentages */}
+      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 10, color: '#555', fontWeight: 600 }}>{awayWidth}%</span>
+        <span style={{ fontSize: 10, color: '#555', fontWeight: 600 }}>{homeWidth}%</span>
       </div>
 
-      {/* Narrative */}
-      {leader && leaderPts > trailerPts && (
-        <div style={{ fontSize: 12, color: '#bbb', lineHeight: 1.5 }}>
-          <span style={{ color: `#${leaderColor}`, fontWeight: 700 }}>{leader}</span>
-          {' '}has outscored{' '}
-          <span style={{ fontWeight: 600 }}>
-            {homePts >= awayPts ? awayName : homeName}
-          </span>
-          {' '}<span style={{ color: '#f0f0f0', fontWeight: 700 }}>{leaderPts}–{trailerPts}</span>
-          {' '}in the last 5 minutes
-        </div>
-      )}
-      {(!leader || leaderPts === trailerPts) && (
-        <div style={{ fontSize: 12, color: '#bbb' }}>
-          Teams are even — <span style={{ color: '#f0f0f0', fontWeight: 700 }}>{homePts}–{awayPts}</span> in the last 5 minutes
+      {/* Run alert — only shows when 7+ point differential */}
+      {isRun && (
+        <div style={{
+          marginTop: 8, fontSize: 11, color: '#bbb', lineHeight: 1.5,
+          borderTop: '1px solid #222', paddingTop: 8,
+        }}>
+          🔥 <span style={{ color: `#${leaderColor}`, fontWeight: 700 }}>{leader}</span>
+          {' '}on a <span style={{ color: '#f0f0f0', fontWeight: 700 }}>{leaderPts}–{trailerPts}</span> run
+          {' '}over {trailer}
         </div>
       )}
     </div>
@@ -226,13 +199,15 @@ function ScoreTicker({ games }: { games: Game[] }) {
   const posRef = React.useRef(0);
   const rafRef = React.useRef<number>(0);
 
-  const tickerGames = [...games].sort((a, b) => {
-    if (a.isLive && !b.isLive) return -1;
-    if (!a.isLive && b.isLive) return 1;
-    if (!a.isFinal && b.isFinal) return -1;
-    if (a.isFinal && !b.isFinal) return 1;
-    return 0;
-  });
+  const tickerGames = [...games]
+    .filter(g => g.home.name !== 'TBD' && g.away.name !== 'TBD')
+    .sort((a, b) => {
+      if (a.isLive && !b.isLive) return -1;
+      if (!a.isLive && b.isLive) return 1;
+      if (!a.isFinal && b.isFinal) return -1;
+      if (a.isFinal && !b.isFinal) return 1;
+      return 0;
+    });
 
   useEffect(() => {
     const el = tickerRef.current;
@@ -378,6 +353,18 @@ function GameCard({ game }: { game: Game }) {
     (!homeWinning && awaySeed > homeSeed + 3)
   );
 
+  const isCloseGame = (() => {
+    if (!game.isLive) return false;
+    const scoreDiff = Math.abs(homeScore - awayScore);
+    if (scoreDiff > 5) return false;
+    const is2nd = game.status.includes('2nd');
+    if (!is2nd) return false;
+    const match = game.status.match(/(\d+):(\d+)/);
+    if (!match) return false;
+    const minsLeft = parseInt(match[1]);
+    return minsLeft <= 5;
+  })();
+
   const accentColor = isUpset ? '#ff6b35' : game.isLive ? '#22c55e33' : '#2a2a2a';
 
   async function generateNarrative() {
@@ -436,9 +423,22 @@ function GameCard({ game }: { game: Game }) {
       )}
 
       {game.isLive && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', animation: 'pulse 1.5s infinite' }} />
-          <span style={{ fontSize: 11, color: '#22c55e', fontWeight: 700, letterSpacing: '0.08em' }}>LIVE · {game.status}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', animation: 'pulse 1.5s infinite' }} />
+            <span style={{ fontSize: 11, color: '#22c55e', fontWeight: 700, letterSpacing: '0.08em' }}>LIVE · {game.status}</span>
+          </div>
+          {isCloseGame && (
+            <span style={{
+              fontSize: 10, fontWeight: 800,
+              background: 'linear-gradient(135deg, #ff3b30, #ff6b35)',
+              color: '#fff', padding: '2px 8px',
+              borderRadius: 10, letterSpacing: '0.06em',
+              animation: 'pulse 1s infinite',
+            }}>
+              🚨 CLOSE GAME
+            </span>
+          )}
         </div>
       )}
       {game.isFinal && (

@@ -30,9 +30,6 @@ One sentence explaining the viral potential and what moment or story is driving 
 💰 ESTIMATED NIL VALUE
 Specific dollar range for tournament-driven deals. Factor in their social buzz.
 
-🎯 BRAND FIT
-Top 3 specific brands that would want this player right now and why.
-
 🚀 UPSIDE POTENTIAL
 Sweet 16: $X — Elite Eight: $X — Final Four: $X
 
