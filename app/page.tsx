@@ -188,6 +188,387 @@ function MomentumMeter({ gameId }: { gameId: string }) {
   );
 }
 
+function TournamentChat({ games, players }: { games: Game[]; players: Player[] }) {
+  const [open, setOpen] = React.useState(false);
+  const [messages, setMessages] = React.useState<{ role: 'user' | 'assistant'; text: string }[]>([
+    { role: 'assistant', text: "What's up. I've got full live tournament context — scores, upsets, leaders, Cinderella stories. Ask me anything." }
+  ]);
+  const [input, setInput] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [leadersData, setLeadersData] = React.useState<any>(null);
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+
+  const [bracketData, setBracketData] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    fetch('/api/leaders').then(r => r.json()).then(d => setLeadersData(d)).catch(() => {});
+    fetch('/api/bracket').then(r => r.json()).then(d => setBracketData(d)).catch(() => {});
+  }, []);
+
+  React.useEffect(() => {
+    if (open) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, open]);
+
+  function buildContext() {
+    const liveGames = games.filter(g => g.isLive);
+    const finalGames = games.filter(g => g.isFinal);
+    const upcomingGames = games.filter(g => !g.isLive && !g.isFinal);
+
+    // Date helpers — must be defined first
+    const todayStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'America/New_York' });
+    const yesterdayStr = new Date(Date.now() - 86400000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'America/New_York' });
+
+    const getDateLabel = (dateStr: string): string => {
+      const d = new Date(dateStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'America/New_York' });
+      if (d === todayStr) return `TODAY (${todayStr})`;
+      if (d === yesterdayStr) return `YESTERDAY (${yesterdayStr})`;
+      return d;
+    };
+
+    const getGameDate = (dateStr: string): string => dateStr ? getDateLabel(dateStr) : '';
+
+    // Use bracket data for complete game history (covers Mar 18-19 which games API misses)
+    const allFinals = bracketData?.games?.filter((g: any) =>
+      g.isFinal && g.home.name !== 'TBD' && g.away.name !== 'TBD'
+    ) || finalGames;
+
+    // Group ALL finals by date label
+    const finalsByDate: Record<string, any[]> = {};
+    allFinals.forEach((g: any) => {
+      const label = getDateLabel(g.date);
+      if (!finalsByDate[label]) finalsByDate[label] = [];
+      finalsByDate[label].push(g);
+    });
+
+    const gamesText = [
+      liveGames.length > 0
+        ? `LIVE RIGHT NOW:\n${liveGames.map(g =>
+            `- #${g.away.seed} ${g.away.name} ${g.away.score} vs #${g.home.seed} ${g.home.name} ${g.home.score} (${g.status})`
+          ).join('\n')}`
+        : `No games live right now. Today is ${todayStr}.`,
+
+      ...Object.entries(finalsByDate).map(([label, gs]) =>
+        `COMPLETED GAMES — ${label}:\n${gs.map(g => {
+          const homeWon = parseInt(g.home.score) > parseInt(g.away.score);
+          const winner = homeWon ? g.home : g.away;
+          const loser = homeWon ? g.away : g.home;
+          const isUpset = parseInt(winner.seed || '0') > parseInt(loser.seed || '0') + 2;
+          return `- #${winner.seed} ${winner.name} def #${loser.seed} ${loser.name} ${winner.score}-${loser.score}${isUpset ? ' ⚡UPSET' : ''}`;
+        }).join('\n')}`
+      ),
+
+      upcomingGames.filter(g => getDateLabel(g.date).includes(todayStr)).length > 0
+        ? `UPCOMING TODAY (${todayStr}):\n${upcomingGames
+            .filter(g => getDateLabel(g.date).includes(todayStr))
+            .slice(0, 10)
+            .map(g => `- #${g.away.seed} ${g.away.name} vs #${g.home.seed} ${g.home.name} (${g.time})`)
+            .join('\n')}`
+        : '',
+    ].filter(Boolean).join('\n\n');
+
+    const allUpsets = allFinals.filter((g: any) => {
+      const homeSeed = parseInt(g.home.seed || '8');
+      const awaySeed = parseInt(g.away.seed || '8');
+      const homeWon = parseInt(g.home.score) > parseInt(g.away.score);
+      return (homeWon && homeSeed > awaySeed + 2) || (!homeWon && awaySeed > homeSeed + 2);
+    }).map((g: any) => {
+      const homeWon = parseInt(g.home.score) > parseInt(g.away.score);
+      const winner = homeWon ? g.home : g.away;
+      const loser = homeWon ? g.away : g.home;
+      const diff = Math.abs(parseInt(winner.seed || '0') - parseInt(loser.seed || '0'));
+      return `- ${getDateLabel(g.date)}: #${winner.seed} ${winner.name} def #${loser.seed} ${loser.name} ${winner.score}-${loser.score} (${diff}-seed upset)`;
+    }).join('\n') || 'No upsets yet';
+
+    const cinderellas = players.slice(0, 8).map(p =>
+      `- ${p.name} (${p.team} #${p.teamSeed}) — Cinderella Score ${p.cinderellaScore}/10. Upset #${p.oppSeed} ${p.oppName}. Stats: ${Object.values(p.stats).map((s: any) => `${s.value} ${s.label}`).join(', ')}`
+    ).join('\n') || 'No cinderella data yet';
+
+    const scoring = leadersData?.scoring?.slice(0, 20).map((p: any) => {
+      const dateLabel = getGameDate(p.topGame?.date);
+      return `- ${p.name} (${p.team} #${p.seed} seed): ${p.ppg} PPG, ${p.rpg} RPG, ${p.apg} APG${dateLabel ? ` [game: ${dateLabel}]` : ''}`;
+    }).join('\n') || 'No scoring data yet';
+
+    const topGames = leadersData?.topGames?.slice(0, 10).map((p: any) => {
+      const dateLabel = getGameDate(p.topGame?.date);
+      return `- ${p.name} (${p.team}): ${p.topGame?.pts}pts ${p.topGame?.reb}reb ${p.topGame?.ast}ast vs ${p.topGame?.opponent}${dateLabel ? ` [${dateLabel}]` : ''} — Game Score ${p.topGame?.gameScore}/10`;
+    }).join('\n') || 'No top games data yet';
+
+   const allPlayers = leadersData?.scoring?.map((p: any) => {
+      const dateLabel = getGameDate(p.topGame?.date);
+      return `- ${p.name} (${p.team}) vs ${p.topGame?.opponent}: ${p.topGame?.pts}pts ${p.topGame?.reb}reb ${p.topGame?.ast}ast ${p.topGame?.fg} FG${dateLabel ? ` [${dateLabel}]` : ''}`;
+    }).join('\n') || '';
+
+    const leaders = `TOP SCORING LEADERS:\n${scoring}\n\nTOP INDIVIDUAL PERFORMANCES:\n${topGames}\n\nALL TOURNAMENT PLAYERS (use for specific player/game lookups):\n${allPlayers}`;
+
+    // All final scores from every tournament game
+    const allScores = allFinals
+      .map((g: any) => {
+        const homeWon = parseInt(g.home.score) > parseInt(g.away.score);
+        const winner = homeWon ? g.home : g.away;
+        const loser = homeWon ? g.away : g.home;
+        const dateLabel = getDateLabel(g.date);
+        return `- #${winner.seed} ${winner.name} def #${loser.seed} ${loser.name} ${winner.score}-${loser.score} [${dateLabel}]`;
+      }).join('\n') || 'No completed games yet';
+
+    return { games: gamesText, upsets: allUpsets, leaders, cinderellas, scores: allScores };
+  }
+
+  async function sendMessage() {
+    if (!input.trim() || loading) return;
+    const userMsg = input.trim();
+    setInput('');
+    setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+    setLoading(true);
+
+    try {
+      const context = buildContext();
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMsg, context }),
+      });
+      const data = await res.json();
+      setMessages(prev => [...prev, { role: 'assistant', text: data.reply || 'Unable to respond.' }]);
+    } catch {
+      setMessages(prev => [...prev, { role: 'assistant', text: 'Something went wrong. Try again.' }]);
+    }
+    setLoading(false);
+  }
+
+  const suggestions = [
+    "Who's the best story of the tournament?",
+    "Which game should I watch right now?",
+    "Who's the biggest upset threat today?",
+    "Give me your Final Four prediction",
+  ];
+
+  return (
+    <>
+      {/* Floating button */}
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          position: 'fixed', bottom: 24, right: 24, zIndex: 200,
+          width: 56, height: 56, borderRadius: '50%',
+          background: open ? '#2a2a2a' : 'linear-gradient(135deg, #ff6b35, #ff4500)',
+          border: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 4px 20px rgba(255,107,53,0.4)',
+          fontSize: 22, transition: 'all 0.2s',
+        }}>
+        {open ? '✕' : '🤖'}
+      </button>
+
+      {/* Chat panel */}
+      {open && (
+        <div style={{
+          position: 'fixed', bottom: 92, right: 24, zIndex: 199,
+          width: 360, height: 520,
+          background: '#141414', border: '1px solid #2a2a2a',
+          borderRadius: 20, display: 'flex', flexDirection: 'column',
+          boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
+          overflow: 'hidden',
+        }}>
+          {/* Header */}
+          <div style={{
+            padding: '14px 16px', borderBottom: '1px solid #2a2a2a',
+            background: '#1a1a1a',
+            display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: '50%',
+              background: 'linear-gradient(135deg, #ff6b35, #ff4500)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 18, flexShrink: 0,
+            }}>🤖</div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#f0f0f0' }}>Tournament Analyst</div>
+              <div style={{ fontSize: 10, color: '#22c55e', fontWeight: 600 }}>● Live context loaded</div>
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div style={{
+            flex: 1, overflowY: 'auto', padding: '12px 14px',
+            display: 'flex', flexDirection: 'column', gap: 10,
+          }}>
+            {messages.map((msg, i) => (
+              <div key={i} style={{
+                display: 'flex',
+                justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+              }}>
+                <div style={{
+                  maxWidth: '85%', padding: '10px 14px',
+                  borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                  background: msg.role === 'user' ? '#ff6b35' : '#2a2a2a',
+                  fontSize: 13, color: '#f0f0f0', lineHeight: 1.6,
+                }}
+                  dangerouslySetInnerHTML={{ __html: msg.text.replace(/\*\*(.+?)\*\*/g, '<strong style="color:#f0f0f0;font-weight:700">$1</strong>') }}
+                />
+              </div>
+            ))}
+            {loading && (
+              <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                <div style={{
+                  padding: '10px 14px', borderRadius: '18px 18px 18px 4px',
+                  background: '#2a2a2a', fontSize: 13, color: '#555',
+                  fontStyle: 'italic',
+                }}>
+                  Analyzing tournament data...
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Suggestions — only show on first message */}
+          {messages.length === 1 && (
+            <div style={{ padding: '0 14px 10px', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {suggestions.map((s, i) => (
+                <button key={i} onClick={() => { setInput(s); }}
+                  style={{
+                    fontSize: 10, padding: '4px 10px',
+                    background: 'transparent', border: '1px solid #333',
+                    borderRadius: 12, color: '#888', cursor: 'pointer',
+                    textAlign: 'left', lineHeight: 1.4,
+                  }}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Input */}
+          <div style={{
+            padding: '10px 12px', borderTop: '1px solid #2a2a2a',
+            display: 'flex', gap: 8, alignItems: 'center',
+          }}>
+            <input
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && sendMessage()}
+              placeholder="Ask anything about the tournament..."
+              style={{
+                flex: 1, background: '#2a2a2a', border: '1px solid #333',
+                borderRadius: 20, padding: '8px 14px',
+                fontSize: 12, color: '#f0f0f0', outline: 'none',
+              }}
+            />
+            <button onClick={sendMessage} disabled={loading || !input.trim()}
+              style={{
+                width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+                background: input.trim() && !loading ? '#ff6b35' : '#2a2a2a',
+                border: 'none', cursor: input.trim() && !loading ? 'pointer' : 'default',
+                fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'background 0.15s',
+              }}>
+              ➤
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function DNAReport({ gameId }: { gameId: string }) {
+  const [data, setData] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [expanded, setExpanded] = React.useState(false);
+
+  async function generate() {
+    if (data) { setExpanded(!expanded); return; }
+    setLoading(true);
+    setExpanded(true);
+    try {
+      const res = await fetch(`/api/dna?id=${gameId}`);
+      const json = await res.json();
+      setData(json);
+    } catch { }
+    setLoading(false);
+  }
+
+  const report = data?.report || '';
+
+  return (
+    <>
+      <button onClick={generate} style={{
+        flex: 1, padding: '9px', fontSize: 12, fontWeight: 600,
+        background: expanded ? '#2a2a2a' : 'transparent',
+        border: '1px solid #2a2a2a', borderRadius: 8,
+        color: expanded ? '#f0f0f0' : '#666', cursor: 'pointer',
+        letterSpacing: '0.03em',
+      }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = '#ff6b35'; e.currentTarget.style.color = '#ff6b35'; }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2a2a'; e.currentTarget.style.color = expanded ? '#f0f0f0' : '#666'; }}>
+        {loading ? '🧬 Analyzing...' : expanded ? '▲ Hide DNA report' : '🧬 DNA report'}
+      </button>
+
+      {expanded && (
+        <div style={{
+          marginTop: 10, padding: '14px 16px',
+          background: '#111', borderRadius: 10,
+          borderLeft: '3px solid #ff6b35',
+        }}>
+          {loading ? (
+            <div style={{ fontSize: 13, color: '#555', fontStyle: 'italic' }}>
+              Analyzing matchup DNA...
+            </div>
+          ) : (
+            <>
+              {data?.awayTeam && data?.homeTeam && (
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  {[data.awayTeam, data.homeTeam].map((t: any, i: number) => (
+                    <div key={i} style={{
+                      flex: 1, background: '#1a1a1a', borderRadius: 8,
+                      padding: '8px 10px', border: '1px solid #2a2a2a',
+                    }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#f0f0f0', marginBottom: 6 }}>
+                        {t.seed ? `#${t.seed} ` : ''}{t.name?.split(' ').slice(-1)[0]}
+                      </div>
+                      {[
+                        { label: 'PPG', value: t.ppg },
+                        { label: 'OPP', value: t.oppPpg },
+                        { label: 'FG%', value: t.fgPct ? `${t.fgPct}%` : null },
+                        { label: '3P%', value: t.threePct ? `${t.threePct}%` : null },
+                        { label: 'REB', value: t.reb },
+                        { label: 'TO', value: t.to },
+                      ].filter(s => s.value).map((s, j) => (
+                        <div key={j} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                          <span style={{ fontSize: 10, color: '#555' }}>{s.label}</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: '#aaa' }}>{s.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ fontSize: 13, lineHeight: 1.8 }}>
+                {report.split('\n').map((line: string, i: number) => {
+                  const isHeader = /^[🔑⚡🎯🏆]/.test(line);
+                  const parsed = line.replace(/\*\*(.+?)\*\*/g, '<strong style="color:#f0f0f0;font-weight:700">$1</strong>');
+                  if (!line.trim()) return <div key={i} style={{ height: 6 }} />;
+                  return (
+                    <div key={i}
+                      style={{
+                        marginBottom: isHeader ? 2 : 4,
+                        color: isHeader ? '#f0f0f0' : '#bbb',
+                        fontWeight: isHeader ? 700 : 400,
+                        fontSize: isHeader ? 12 : 13,
+                      }}
+                      dangerouslySetInnerHTML={{ __html: parsed }}
+                    />
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
 function scoreColor(score: number) {
   if (score >= 8) return '#22c55e';
   if (score >= 5) return '#ff6b35';
@@ -199,14 +580,26 @@ function ScoreTicker({ games }: { games: Game[] }) {
   const posRef = React.useRef(0);
   const rafRef = React.useRef<number>(0);
 
+  const today = new Date().toLocaleDateString('en-US', {
+    month: 'long', day: 'numeric', timeZone: 'America/New_York'
+  });
   const tickerGames = [...games]
-    .filter(g => g.home.name !== 'TBD' && g.away.name !== 'TBD')
+    .filter(g => {
+      if (g.home.name === 'TBD' || g.away.name === 'TBD') return false;
+      // Always show live games regardless of date
+      if (g.isLive) return true;
+      // Only show finals and upcoming from today
+      const gameDate = new Date(g.date).toLocaleDateString('en-US', {
+        month: 'long', day: 'numeric', timeZone: 'America/New_York'
+      });
+      return gameDate === today;
+    })
     .sort((a, b) => {
       if (a.isLive && !b.isLive) return -1;
       if (!a.isLive && b.isLive) return 1;
       if (!a.isFinal && b.isFinal) return -1;
       if (a.isFinal && !b.isFinal) return 1;
-      return 0;
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
     });
 
   useEffect(() => {
@@ -497,17 +890,21 @@ function GameCard({ game }: { game: Game }) {
       {game.venue && <div style={{ fontSize: 11, color: '#666', marginBottom: 12 }}>📍 {game.venue}</div>}
 
       <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={toggleBoxScore} style={{
-          flex: 1, padding: '9px', fontSize: 12, fontWeight: 600,
-          background: boxScoreExpanded ? '#2a2a2a' : 'transparent',
-          border: '1px solid #2a2a2a', borderRadius: 8,
-          color: boxScoreExpanded ? '#f0f0f0' : '#666', cursor: 'pointer',
-          letterSpacing: '0.03em'
-        }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = '#555'; e.currentTarget.style.color = '#f0f0f0'; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2a2a'; e.currentTarget.style.color = boxScoreExpanded ? '#f0f0f0' : '#666'; }}>
-          {boxScoreLoading ? 'Loading...' : boxScoreExpanded ? '▲ Hide box score' : '📊 Box score'}
-        </button>
+        {!game.isLive && !game.isFinal ? (
+          <DNAReport gameId={game.id} />
+        ) : (
+          <button onClick={toggleBoxScore} style={{
+            flex: 1, padding: '9px', fontSize: 12, fontWeight: 600,
+            background: boxScoreExpanded ? '#2a2a2a' : 'transparent',
+            border: '1px solid #2a2a2a', borderRadius: 8,
+            color: boxScoreExpanded ? '#f0f0f0' : '#666', cursor: 'pointer',
+            letterSpacing: '0.03em'
+          }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#555'; e.currentTarget.style.color = '#f0f0f0'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2a2a'; e.currentTarget.style.color = boxScoreExpanded ? '#f0f0f0' : '#666'; }}>
+            {boxScoreLoading ? 'Loading...' : boxScoreExpanded ? '▲ Hide box score' : '📊 Box score'}
+          </button>
+        )}
         <button onClick={generateNarrative} style={{
           flex: 1, padding: '9px', fontSize: 12, fontWeight: 600,
           background: narrativeExpanded ? '#2a2a2a' : 'transparent',
@@ -613,7 +1010,9 @@ function GameCard({ game }: { game: Game }) {
         }}>
           {narrativeLoading ? (
             <div style={{ color: '#555', fontStyle: 'italic' }}>Claude is writing the story...</div>
-          ) : narrative}
+          ) : (
+            <div dangerouslySetInnerHTML={{ __html: narrative.replace(/\*\*(.+?)\*\*/g, '<strong style="color:#f0f0f0;font-weight:700">$1</strong>') }} />
+          )}
         </div>
       )}
     </div>
@@ -1142,6 +1541,148 @@ function BracketTab() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function BracketBustersTab() {
+  const [data, setData] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [activeSubTab, setActiveSubTab] = React.useState<'busters' | 'upsets'>('busters');
+
+  useEffect(() => {
+    fetch('/api/busters').then(r => r.json()).then(d => setData(d)).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return (
+    <div style={{ textAlign: 'center', padding: '3rem', color: '#555' }}>
+      <div style={{ fontSize: 24, marginBottom: 12 }}>🔮</div>
+      Calculating bracket chaos...
+    </div>
+  );
+
+  const teams = data?.teams || [];
+
+  if (teams.length === 0) return (
+    <div style={{ textAlign: 'center', padding: '3rem', color: '#555', fontSize: 13 }}>
+      No bracket busters yet. Check back as upsets happen.
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Sub-tab pills */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: '1.25rem' }}>
+        {([
+          { key: 'busters', label: '🔮 Bracket Busters' },
+          { key: 'upsets', label: '⚡ Upset History' },
+        ] as const).map(t => (
+          <button key={t.key} onClick={() => setActiveSubTab(t.key)} style={{
+            padding: '7px 16px', fontSize: 12, fontWeight: 700,
+            borderRadius: 20, border: '1px solid',
+            borderColor: activeSubTab === t.key ? '#ff6b35' : '#2a2a2a',
+            background: activeSubTab === t.key ? '#ff6b35' : 'transparent',
+            color: activeSubTab === t.key ? '#fff' : '#888',
+            cursor: 'pointer',
+          }}>{t.label}</button>
+        ))}
+      </div>
+
+      {activeSubTab === 'upsets' && <UpsetHistoryTab />}
+
+      {activeSubTab === 'busters' && <>
+      <div style={{ marginBottom: '1rem', padding: '12px 16px', background: '#1a1a1a', borderRadius: 10, border: '1px solid #2a2a2a' }}>
+        <div style={{ fontSize: 11, color: '#ff6b35', fontWeight: 800, marginBottom: 4, letterSpacing: '0.06em' }}>🔮 BRACKET BUSTER SCORE</div>
+        <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>
+          Teams ranked by how many brackets they've already destroyed. Score = estimated % of brackets that had their victims advancing further.
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {teams.map((team: any, i: number) => {
+          const score = Math.round(team.totalBracketsBusted);
+          const isTop = i < 3;
+          const barColor = i === 0 ? '#ff3b30' : i === 1 ? '#ff6b35' : i === 2 ? '#ff9500' : '#666';
+
+          return (
+            <div key={team.name} style={{
+              background: '#1a1a1a',
+              border: `1px solid ${isTop ? barColor + '44' : '#2a2a2a'}`,
+              borderRadius: 14,
+              padding: '1rem 1.25rem',
+              borderLeft: `4px solid ${barColor}`,
+              position: 'relative',
+            }}>
+              {/* Rank badge */}
+              <div style={{
+                position: 'absolute', top: 12, right: 12,
+                background: isTop ? barColor : '#2a2a2a',
+                color: '#fff', fontSize: 11, fontWeight: 800,
+                padding: '3px 10px', borderRadius: 20,
+              }}>
+                #{i + 1} BUSTER
+              </div>
+
+              {/* Team header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                {team.logo && (
+                  <img src={team.logo} alt="" style={{ width: 36, height: 36, objectFit: 'contain' }}
+                    onError={(e) => (e.currentTarget.style.display = 'none')} />
+                )}
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#f0f0f0' }}>
+                    #{team.seed} {team.shortName}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>
+                    {team.wins.length} upset win{team.wins.length > 1 ? 's' : ''} · Highest seed beaten: #{team.highestSeedBeaten}
+                  </div>
+                </div>
+              </div>
+
+              {/* Bracket buster score bar */}
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ fontSize: 10, color: '#555', fontWeight: 700, letterSpacing: '0.06em' }}>BRACKETS BUSTED</span>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: barColor }}>{score}%</span>
+                </div>
+                <div style={{ height: 6, background: '#2a2a2a', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', width: `${Math.min(score, 100)}%`,
+                    background: `linear-gradient(90deg, ${barColor}, ${barColor}88)`,
+                    borderRadius: 3, transition: 'width 1s ease',
+                  }} />
+                </div>
+              </div>
+
+              {/* Wins */}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: team.narrative ? 10 : 0 }}>
+                {team.wins.map((w: any, j: number) => (
+                  <span key={j} style={{
+                    fontSize: 11, padding: '3px 10px',
+                    background: '#222', borderRadius: 20,
+                    border: '1px solid #333', color: '#aaa',
+                    fontWeight: 600,
+                  }}>
+                    def. #{w.loserSeed} {w.loser.split(' ').slice(-1)[0]} {w.score}
+                  </span>
+                ))}
+              </div>
+
+              {/* Claude narrative */}
+              {team.narrative && (
+                <div style={{
+                  marginTop: 10, fontSize: 12, color: '#bbb',
+                  lineHeight: 1.7, borderTop: '1px solid #222', paddingTop: 10,
+                  fontStyle: 'italic',
+                }}>
+                  {team.narrative}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      </>}
     </div>
   );
 }
@@ -1717,7 +2258,7 @@ export default function Home() {
             cursor: 'pointer', transition: 'all 0.15s',
             letterSpacing: '0.02em'
           }}>
-            {tab === 'games' ? '🏀 Live' : tab === 'players' ? '⭐ Cinderella' : tab === 'bracket' ? '🗓 Bracket' : tab === 'upsets' ? '⚡ Upsets' : '🏆 Leaders'}
+            {tab === 'games' ? '📊 Scores' : tab === 'players' ? '⭐ Cinderella' : tab === 'bracket' ? '🗓 Bracket' : tab === 'upsets' ? '🔮 Busters' : '🏆 Leaders'}
           </button>
         ))}
       </div>
@@ -1737,7 +2278,14 @@ export default function Home() {
           />
           <div style={{ display: 'flex', gap: 8, marginBottom: '1.25rem', flexWrap: 'wrap' }}>
             {(['all', 'live', 'final', 'upcoming'] as const).map(f => (
-              <button key={f} onClick={() => setGameFilter(f)} style={{
+              <button key={f} onClick={() => {
+                setGameFilter(f);
+                if (f === 'live') {
+                  setActiveDateFilter(new Date().toLocaleDateString('en-US', {
+                    month: 'long', day: 'numeric', timeZone: 'America/New_York'
+                  }));
+                }
+              }} style={{
                 padding: '6px 16px', fontSize: 12, fontWeight: 600,
                 borderRadius: 20, border: '1px solid',
                 borderColor: gameFilter === f ? '#ff6b35' : '#2a2a2a',
@@ -1801,84 +2349,136 @@ export default function Home() {
 
             return (
               <>
-                {/* ESPN-style date selector */}
-                {allGroups.length > 1 && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'stretch',
-                    background: '#1a1a1a',
-                    border: '1px solid #2a2a2a',
-                    borderRadius: 12,
-                    overflow: 'hidden',
-                    marginBottom: 16,
-                    height: 76,
-                  }}>
-                    {allGroups.map((group, i) => {
-                      const d = new Date(
-                        filteredGames.find(g =>
-                          new Date(g.date).toLocaleDateString('en-US', {
-                            month: 'long', day: 'numeric', timeZone: 'America/New_York'
-                          }) === group.dateKey
-                        )?.date || ''
-                      );
-                      const dayName = d.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/New_York' }).toUpperCase();
-                      const monthDay = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).toUpperCase();
-                      const isActive = activeDateFilter === group.dateKey;
-                      const liveInGroup = group.games.filter(g => g.isLive).length;
-                      return (
-                        <button
-                          key={group.dateKey}
-                          onClick={() => setActiveDateFilter(group.dateKey)}
-                          style={{
-                            flex: '1 1 0',
-                            width: 0,
-                            minWidth: 0,
-                            padding: '12px 8px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 2,
-                            background: isActive ? '#ff6b35' : 'transparent',
-                            border: 'none',
-                            borderRight: i < allGroups.length - 1 ? '1px solid #2a2a2a' : 'none',
-                            cursor: 'pointer',
-                            transition: 'background 0.15s',
-                            position: 'relative',
-                          }}>
-                          <span style={{
-                            fontSize: 10,
-                            fontWeight: 700,
-                            color: isActive ? '#fff' : '#666',
-                            letterSpacing: '0.06em',
-                            lineHeight: '1',
-                            display: 'block',
-                          }}>
-                            {dayName}
-                          </span>
-                          <span style={{
-                            fontSize: 13,
-                            fontWeight: 800,
-                            color: isActive ? '#fff' : '#f0f0f0',
-                            letterSpacing: '0.02em',
-                            lineHeight: '1',
-                            display: 'block',
-                          }}>
-                            {monthDay}
-                          </span>
-                          {liveInGroup > 0 && (
-                            <div style={{
-                              position: 'absolute', top: 6, right: 8,
-                              width: 6, height: 6, borderRadius: '50%',
-                              background: isActive ? '#fff' : '#22c55e',
-                              animation: 'pulse 1.5s infinite',
-                            }} />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+                {/* ESPN-style date selector with arrows */}
+                {allGroups.length > 1 && (() => {
+                  const activeIdx = allGroups.findIndex(g => g.dateKey === activeDateFilter);
+                  const windowStart = Math.max(0, Math.min(activeIdx - 1, allGroups.length - 3));
+                  const visibleDates = allGroups.slice(windowStart, windowStart + 3);
+                  const canGoLeft = windowStart > 0;
+                  const canGoRight = windowStart + 3 < allGroups.length;
+
+                  return (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'stretch',
+                      background: '#1a1a1a',
+                      border: '1px solid #2a2a2a',
+                      borderRadius: 12,
+                      overflow: 'hidden',
+                      marginBottom: 16,
+                      height: 76,
+                    }}>
+                      {/* Left arrow */}
+                      <button
+                        onClick={() => {
+                          const prevIdx = allGroups.findIndex(g => g.dateKey === activeDateFilter) - 1;
+                          if (prevIdx >= 0) setActiveDateFilter(allGroups[prevIdx].dateKey);
+                        }}
+                        disabled={activeIdx === 0}
+                        style={{
+                          width: 36, flexShrink: 0,
+                          background: 'transparent',
+                          border: 'none',
+                          borderRight: '1px solid #2a2a2a',
+                          cursor: activeIdx === 0 ? 'default' : 'pointer',
+                          color: activeIdx === 0 ? '#333' : '#888',
+                          fontSize: 16,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          transition: 'color 0.15s',
+                        }}
+                        onMouseEnter={e => { if (activeIdx > 0) e.currentTarget.style.color = '#f0f0f0'; }}
+                        onMouseLeave={e => { e.currentTarget.style.color = activeIdx === 0 ? '#333' : '#888'; }}
+                      >
+                        ‹
+                      </button>
+
+                      {/* 3 visible date tabs */}
+                      {visibleDates.map((group, i) => {
+                        const d = new Date(
+                          filteredGames.find(g =>
+                            new Date(g.date).toLocaleDateString('en-US', {
+                              month: 'long', day: 'numeric', timeZone: 'America/New_York'
+                            }) === group.dateKey
+                          )?.date || group.dateKey
+                        );
+                        const dayName = d.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/New_York' }).toUpperCase();
+                        const monthDay = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }).toUpperCase();
+                        const isActive = activeDateFilter === group.dateKey;
+                        const liveInGroup = group.games.filter(g => g.isLive).length;
+
+                        return (
+                          <button
+                            key={group.dateKey}
+                            onClick={() => setActiveDateFilter(group.dateKey)}
+                            style={{
+                              flex: '1 1 0',
+                              width: 0,
+                              minWidth: 0,
+                              padding: '12px 8px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 2,
+                              background: isActive ? '#ff6b35' : 'transparent',
+                              border: 'none',
+                              borderRight: i < visibleDates.length - 1 ? '1px solid #2a2a2a' : 'none',
+                              cursor: 'pointer',
+                              transition: 'background 0.15s',
+                              position: 'relative',
+                            }}>
+                            <span style={{
+                              fontSize: 10, fontWeight: 700,
+                              color: isActive ? '#fff' : '#666',
+                              letterSpacing: '0.06em', lineHeight: '1', display: 'block',
+                            }}>
+                              {dayName}
+                            </span>
+                            <span style={{
+                              fontSize: 13, fontWeight: 800,
+                              color: isActive ? '#fff' : '#f0f0f0',
+                              letterSpacing: '0.02em', lineHeight: '1', display: 'block',
+                            }}>
+                              {monthDay}
+                            </span>
+                            {liveInGroup > 0 && (
+                              <div style={{
+                                position: 'absolute', top: 6, right: 8,
+                                width: 6, height: 6, borderRadius: '50%',
+                                background: isActive ? '#fff' : '#22c55e',
+                                animation: 'pulse 1.5s infinite',
+                              }} />
+                            )}
+                          </button>
+                        );
+                      })}
+
+                      {/* Right arrow */}
+                      <button
+                        onClick={() => {
+                          const nextIdx = allGroups.findIndex(g => g.dateKey === activeDateFilter) + 1;
+                          if (nextIdx < allGroups.length) setActiveDateFilter(allGroups[nextIdx].dateKey);
+                        }}
+                        disabled={activeIdx === allGroups.length - 1}
+                        style={{
+                          width: 36, flexShrink: 0,
+                          background: 'transparent',
+                          border: 'none',
+                          borderLeft: '1px solid #2a2a2a',
+                          cursor: activeIdx === allGroups.length - 1 ? 'default' : 'pointer',
+                          color: activeIdx === allGroups.length - 1 ? '#333' : '#888',
+                          fontSize: 16,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          transition: 'color 0.15s',
+                        }}
+                        onMouseEnter={e => { if (activeIdx < allGroups.length - 1) e.currentTarget.style.color = '#f0f0f0'; }}
+                        onMouseLeave={e => { e.currentTarget.style.color = activeIdx === allGroups.length - 1 ? '#333' : '#888'; }}
+                      >
+                        ›
+                      </button>
+                    </div>
+                  );
+                })()}
 
                 {/* Game groups — no header when filtered to single date */}
                 {visibleGroups.map((group, gi) => (
@@ -1941,9 +2541,10 @@ export default function Home() {
         Updates every 60 seconds · ESPN + Claude AI
       </div>
       {activeTab === 'bracket' && <BracketTab />}
-      {activeTab === 'upsets' && <UpsetHistoryTab />}
+      {activeTab === 'upsets' && <BracketBustersTab />}
       {activeTab === 'leaders' && <LeadersTab />}
       {nilPlayer && <NILModal player={nilPlayer} onClose={() => setNilPlayer(null)} />}
+      <TournamentChat games={games} players={players} />
     </main>
   );
 }

@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 
 function getTournamentDates(): string[] {
-  const today = new Date();
+  const start = new Date('2026-03-17');
+  const end = new Date();
+  end.setDate(end.getDate() + 3); // show 3 days ahead
   const dates: string[] = [];
-  for (let offset = -1; offset <= 3; offset++) {
-    const d = new Date(today);
-    d.setDate(d.getDate() + offset);
-    dates.push(d.toISOString().slice(0, 10).replace(/-/g, ''));
+  const current = new Date(start);
+  while (current <= end) {
+    dates.push(current.toISOString().slice(0, 10).replace(/-/g, ''));
+    current.setDate(current.getDate() + 1);
   }
   return dates;
 }
