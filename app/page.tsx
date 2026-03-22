@@ -353,8 +353,9 @@ function TournamentChat({ games, players }: { games: Game[]; players: Player[] }
           background: open ? '#2a2a2a' : 'linear-gradient(135deg, #ff6b35, #ff4500)',
           border: 'none', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 4px 20px rgba(255,107,53,0.4)',
+          boxShadow: open ? 'none' : '0 4px 32px rgba(255,107,53,0.65)',
           fontSize: 22, transition: 'all 0.2s',
+          animation: open ? 'none' : 'bounce 2s ease-in-out 3s 3',
         }}>
         {open ? '✕' : '🤖'}
       </button>
@@ -396,6 +397,7 @@ function TournamentChat({ games, players }: { games: Game[]; players: Player[] }
               <div key={i} style={{
                 display: 'flex',
                 justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                animation: 'fadeIn 0.25s ease forwards',
               }}>
                 <div style={{
                   maxWidth: '85%', padding: '10px 14px',
@@ -624,13 +626,15 @@ function ScoreTicker({ games }: { games: Game[] }) {
 
   return (
     <div style={{
-      background: '#141414',
-      borderBottom: '1px solid #2a2a2a',
+      background: '#111111',
+      borderBottom: '1px solid #333',
       overflow: 'hidden',
       position: 'fixed',
       top: 0, left: 0, right: 0,
       zIndex: 50,
       height: 40,
+      maskImage: 'linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%)',
+      WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%)',
     }}>
       <div ref={tickerRef} style={{
         display: 'flex',
@@ -758,7 +762,7 @@ function GameCard({ game }: { game: Game }) {
     return minsLeft <= 5;
   })();
 
-  const accentColor = isUpset ? '#ff6b35' : game.isLive ? '#22c55e33' : '#2a2a2a';
+  const accentColor = isUpset ? '#ff6b35' : game.isLive ? '#22c55e' : '#2a2a2a';
 
   async function generateNarrative() {
     if (narrative) { setNarrativeExpanded(!narrativeExpanded); return; }
@@ -835,7 +839,10 @@ function GameCard({ game }: { game: Game }) {
         </div>
       )}
       {game.isFinal && (
-        <div style={{ fontSize: 11, color: '#666', marginBottom: 10, letterSpacing: '0.08em', fontWeight: 600 }}>FINAL</div>
+        <div style={{ fontSize: 10, color: '#888', marginBottom: 10, letterSpacing: '0.12em', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#333' }} />
+          FINAL
+        </div>
       )}
       {!game.isLive && !game.isFinal && (
         <UpcomingCountdown date={game.date} time={game.time} />
@@ -855,16 +862,16 @@ function GameCard({ game }: { game: Game }) {
         <div style={{ textAlign: 'center', minWidth: 90 }}>
           {(game.isLive || game.isFinal) ? (
             <>
-              <div style={{ fontSize: 24, fontWeight: 800, color: '#f0f0f0', letterSpacing: 1, marginBottom: 6 }}>
+              <div style={{ fontSize: 30, fontWeight: 900, color: '#f0f0f0', letterSpacing: 1, marginBottom: 6 }}>
                 {game.away.score} <span style={{ color: '#444', fontSize: 16 }}>–</span> {game.home.score}
               </div>
               {game.isLive && game.homeWinProb !== null && game.homeWinProb !== undefined && (
                 <div>
-                  <div style={{ display: 'flex', height: 4, borderRadius: 2, overflow: 'hidden', marginBottom: 3 }}>
+                  <div style={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden', marginBottom: 4 }}>
                     <div style={{ width: `${game.awayWinProb}%`, background: `#${game.away.color || '378ADD'}`, transition: 'width 1s' }} />
                     <div style={{ width: `${game.homeWinProb}%`, background: `#${game.home.color || 'D85A30'}`, transition: 'width 1s' }} />
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#555', fontWeight: 700 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#666', fontWeight: 700 }}>
                     <span>{game.awayWinProb}%</span>
                     <span>{game.homeWinProb}%</span>
                   </div>
@@ -872,7 +879,7 @@ function GameCard({ game }: { game: Game }) {
               )}
             </>
           ) : (
-            <div style={{ fontSize: 12, color: '#555', fontWeight: 600 }}>VS</div>
+            <div style={{ fontSize: 11, color: '#444', fontWeight: 800, letterSpacing: '0.15em', border: '1px solid #2a2a2a', borderRadius: 6, padding: '4px 10px' }}>VS</div>
           )}
         </div>
 
@@ -887,17 +894,17 @@ function GameCard({ game }: { game: Game }) {
         </div>
       </div>
 
-      {game.venue && <div style={{ fontSize: 11, color: '#666', marginBottom: 12 }}>📍 {game.venue}</div>}
+      {game.venue && <div style={{ fontSize: 11, color: '#555', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 4 }}>📍 <span>{game.venue}</span></div>}
 
       <div style={{ display: 'flex', gap: 8 }}>
         {!game.isLive && !game.isFinal ? (
           <DNAReport gameId={game.id} />
         ) : (
           <button onClick={toggleBoxScore} style={{
-            flex: 1, padding: '9px', fontSize: 12, fontWeight: 600,
-            background: boxScoreExpanded ? '#2a2a2a' : 'transparent',
-            border: '1px solid #2a2a2a', borderRadius: 8,
-            color: boxScoreExpanded ? '#f0f0f0' : '#666', cursor: 'pointer',
+            flex: 1, padding: '10px', fontSize: 12, fontWeight: 700,
+            background: boxScoreExpanded ? '#2a2a2a' : '#1f1f1f',
+            border: '1px solid #333', borderRadius: 8,
+            color: boxScoreExpanded ? '#f0f0f0' : '#888', cursor: 'pointer',
             letterSpacing: '0.03em'
           }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = '#555'; e.currentTarget.style.color = '#f0f0f0'; }}
@@ -905,17 +912,6 @@ function GameCard({ game }: { game: Game }) {
             {boxScoreLoading ? 'Loading...' : boxScoreExpanded ? '▲ Hide box score' : '📊 Box score'}
           </button>
         )}
-        <button onClick={generateNarrative} style={{
-          flex: 1, padding: '9px', fontSize: 12, fontWeight: 600,
-          background: narrativeExpanded ? '#2a2a2a' : 'transparent',
-          border: '1px solid #2a2a2a', borderRadius: 8,
-          color: narrativeExpanded ? '#f0f0f0' : '#666', cursor: 'pointer',
-          letterSpacing: '0.03em'
-        }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = '#ff6b35'; e.currentTarget.style.color = '#ff6b35'; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2a2a'; e.currentTarget.style.color = narrativeExpanded ? '#f0f0f0' : '#666'; }}>
-          {narrativeLoading ? '✦ Writing...' : narrativeExpanded ? '▲ Hide story' : '✦ AI story'}
-        </button>
       </div>
 
       {boxScoreExpanded && (
@@ -1000,21 +996,6 @@ function GameCard({ game }: { game: Game }) {
       )}
 
       {game.isLive && <MomentumMeter gameId={game.id} />}
-
-      {narrativeExpanded && (
-        <div style={{
-          marginTop: 10, padding: '14px 16px',
-          background: '#111', borderRadius: 10,
-          fontSize: 13, color: '#bbb', lineHeight: 1.8,
-          borderLeft: '3px solid #ff6b35'
-        }}>
-          {narrativeLoading ? (
-            <div style={{ color: '#555', fontStyle: 'italic' }}>Claude is writing the story...</div>
-          ) : (
-            <div dangerouslySetInnerHTML={{ __html: narrative.replace(/\*\*(.+?)\*\*/g, '<strong style="color:#f0f0f0;font-weight:700">$1</strong>') }} />
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -1083,10 +1064,11 @@ function PlayerCard({ player, onNIL }: { player: Player; onNIL: (p: Player) => v
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {Object.values(player.stats).filter((s: any) => parseFloat(s.value) > 0).slice(0, 3).map((stat, i) => (
               <span key={i} style={{
-                fontSize: 11, fontWeight: 600,
-                background: '#222', color: '#ccc',
-                padding: '3px 8px', borderRadius: 6,
-                border: '1px solid #333'
+                fontSize: 11, fontWeight: 700,
+                background: i === 0 ? '#ff6b3518' : i === 1 ? '#22c55e18' : '#3b82f618',
+                color: i === 0 ? '#ff9500' : i === 1 ? '#22c55e' : '#60a5fa',
+                padding: '3px 10px', borderRadius: 20,
+                border: `1px solid ${i === 0 ? '#ff950033' : i === 1 ? '#22c55e33' : '#3b82f633'}`,
               }}>
                 {stat.value} {stat.label}
               </span>
@@ -1096,13 +1078,13 @@ function PlayerCard({ player, onNIL }: { player: Player; onNIL: (p: Player) => v
       </div>
 
       <button onClick={() => onNIL(player)} style={{
-        flexShrink: 0, padding: '7px 14px', fontSize: 11, fontWeight: 700,
-        background: 'transparent', border: `1px solid #333`,
-        borderRadius: 8, color: '#888', cursor: 'pointer', whiteSpace: 'nowrap',
-        letterSpacing: '0.03em'
+        flexShrink: 0, padding: '8px 16px', fontSize: 11, fontWeight: 800,
+        background: '#ff6b3518', border: `1px solid #ff6b3544`,
+        borderRadius: 20, color: '#ff6b35', cursor: 'pointer', whiteSpace: 'nowrap',
+        letterSpacing: '0.06em', transition: 'all 0.15s',
       }}
-        onMouseEnter={e => { e.currentTarget.style.borderColor = '#ff6b35'; e.currentTarget.style.color = '#ff6b35'; e.currentTarget.style.background = '#ff6b3511'; }}
-        onMouseLeave={e => { e.currentTarget.style.borderColor = '#333'; e.currentTarget.style.color = '#888'; e.currentTarget.style.background = 'transparent'; }}>
+        onMouseEnter={e => { e.currentTarget.style.background = '#ff6b35'; e.currentTarget.style.color = '#fff'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(255,107,53,0.4)'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = '#ff6b3511'; e.currentTarget.style.color = '#ff6b35'; e.currentTarget.style.boxShadow = 'none'; }}>
         NIL ↗
       </button>
     </div>
@@ -1192,6 +1174,190 @@ function NILModal({ player, onClose }: { player: Player; onClose: () => void }) 
                       color: isHeader ? '#f0f0f0' : '#bbb',
                       fontWeight: isHeader ? 700 : 400,
                     }}
+                    dangerouslySetInnerHTML={{ __html: parsed }}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CircleStat({ label, value, rank, total, color }: { label: string; value: string | number; rank: number; total: number; color: string }) {
+  const pct = total > 1 ? 1 - (rank - 1) / (total - 1) : 1;
+  const radius = 28;
+  const circ = 2 * Math.PI * radius;
+  const filled = pct * circ;
+  const statColor = pct >= 0.75 ? '#22c55e' : pct >= 0.5 ? '#f0f0f0' : pct >= 0.25 ? '#ff9500' : '#ff3b30';
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+      <div style={{ position: 'relative', width: 64, height: 64 }}>
+        <svg width="64" height="64" style={{ transform: 'rotate(-90deg)' }}>
+          <circle cx="32" cy="32" r={radius} fill="none" stroke="#2a2a2a" strokeWidth="4" />
+          <circle cx="32" cy="32" r={radius} fill="none" stroke={statColor} strokeWidth="4"
+            strokeDasharray={`${filled} ${circ}`} strokeLinecap="round" />
+        </svg>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ fontSize: 13, fontWeight: 800, color: statColor }}>{value}</span>
+        </div>
+      </div>
+      <div style={{ fontSize: 9, color: '#555', fontWeight: 700, letterSpacing: '0.06em', textAlign: 'center' }}>{label}</div>
+      <div style={{ fontSize: 9, color: '#444' }}>#{rank}</div>
+    </div>
+  );
+}
+
+function TeamDetailModal({ team, allTeams, leaders, onClose }: {
+  team: any; allTeams: any[]; leaders: any; onClose: () => void;
+}) {
+  const [scoutReport, setScoutReport] = React.useState('');
+  const [scoutLoading, setScoutLoading] = React.useState(false);
+  const [bracketGames, setBracketGames] = React.useState<any[]>([]);
+
+  React.useEffect(() => {
+    fetch('/api/bracket').then(r => r.json()).then(d => {
+      const games = d.games?.filter((g: any) => g.isFinal && (
+        g.home.name === team.name || g.away.name === team.name
+      )) || [];
+      setBracketGames(games);
+    }).catch(() => {});
+  }, [team.name]);
+
+  // Team leaders from the leaders API
+  const teamLeaders = {
+    pts: leaders?.scoring?.filter((p: any) => p.team === team.name).slice(0, 1)[0],
+    reb: leaders?.rebounds?.filter((p: any) => p.team === team.name).slice(0, 1)[0],
+    ast: leaders?.assists?.filter((p: any) => p.team === team.name).slice(0, 1)[0],
+  };
+
+  // Rankings among all teams
+  function getRank(key: string, higherIsBetter = true) {
+    const sorted = [...allTeams].sort((a, b) => higherIsBetter ? b[key] - a[key] : a[key] - b[key]);
+    return sorted.findIndex(t => t.name === team.name) + 1;
+  }
+
+  const stats = [
+    { label: 'PPG', value: team.ppg, rank: getRank('ppg') },
+    { label: 'FG%', value: `${team.fgPct}%`, rank: getRank('fgPct') },
+    { label: '3P%', value: `${team.threePct}%`, rank: getRank('threePct') },
+    { label: 'REB', value: team.reb, rank: getRank('reb') },
+    { label: 'AST', value: team.ast, rank: getRank('ast') },
+    { label: 'OPP', value: team.oppPpg, rank: getRank('oppPpg', false) },
+  ];
+
+  async function generateScout() {
+    if (scoutReport) return;
+    setScoutLoading(true);
+    const teamLeadersList = leaders?.scoring?.filter((p: any) => p.team === team.name).slice(0, 3) || [];
+    const tournamentGames = bracketGames.map((g: any) => {
+      const isHome = g.home.name === team.name;
+      const teamScore = isHome ? g.home.score : g.away.score;
+      const oppScore = isHome ? g.away.score : g.home.score;
+      const oppName = isHome ? g.away.shortName : g.home.shortName;
+      const won = parseInt(teamScore) > parseInt(oppScore);
+      return { result: won ? 'W' : 'L', opponent: oppName, score: `${teamScore}-${oppScore}`, round: g.round };
+    });
+    try {
+      const res = await fetch('/api/teamscout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ team, leaders: teamLeadersList, tournamentGames }),
+      });
+      const data = await res.json();
+      setScoutReport(data.report || '');
+    } catch { setScoutReport('Unable to generate report.'); }
+    setScoutLoading(false);
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 150, padding: '1rem' }}>
+      <div style={{ background: '#161616', border: '1px solid #2a2a2a', borderRadius: 20, maxWidth: 520, width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
+        {/* Top gradient accent */}
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, transparent, #${team.color || 'ff6b35'}, transparent)`, borderRadius: '20px 20px 0 0' }} />
+
+        {/* Header */}
+        <div style={{ padding: '1.25rem 1.25rem 1rem', borderBottom: '1px solid #222' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {team.logo && <img src={team.logo} alt="" style={{ width: 44, height: 44, objectFit: 'contain' }} onError={e => (e.currentTarget.style.display = 'none')} />}
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 900, color: '#f0f0f0' }}>#{team.seed} {team.shortName}</div>
+                <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>{team.gamesPlayed}G played in tournament · Season team stats below</div>
+              </div>
+            </div>
+            <button onClick={onClose} style={{ background: '#2a2a2a', border: 'none', color: '#888', fontSize: 16, cursor: 'pointer', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+          </div>
+        </div>
+
+        {/* Team leaders */}
+        <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #1f1f1f' }}>
+          <div style={{ fontSize: 10, color: '#ff6b35', fontWeight: 800, letterSpacing: '0.08em', marginBottom: 10 }}>TOURNAMENT LEADERS</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+            {[
+              { label: 'POINTS', player: teamLeaders.pts, stat: 'ppg', statLabel: 'PPG' },
+              { label: 'REBOUNDS', player: teamLeaders.reb, stat: 'rpg', statLabel: 'RPG' },
+              { label: 'ASSISTS', player: teamLeaders.ast, stat: 'apg', statLabel: 'APG' },
+            ].map(({ label, player, stat, statLabel }) => (
+              <div key={label} style={{ background: '#1a1a1a', borderRadius: 10, padding: '10px 8px', textAlign: 'center', border: '1px solid #2a2a2a' }}>
+                <div style={{ fontSize: 9, color: '#555', fontWeight: 700, letterSpacing: '0.06em', marginBottom: 8 }}>{label}</div>
+                {player ? (
+                  <>
+                    {player.headshot && (
+                      <img src={player.headshot} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', marginBottom: 6, display: 'block', margin: '0 auto 6px' }}
+                        onError={e => (e.currentTarget.style.display = 'none')} />
+                    )}
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#f0f0f0', lineHeight: 1.2, marginBottom: 4 }}>{player.shortName || player.name.split(' ').slice(-1)[0]}</div>
+                    <div style={{ fontSize: 16, fontWeight: 900, color: '#ff6b35' }}>{(player as any)[stat]}</div>
+                    <div style={{ fontSize: 9, color: '#555' }}>{statLabel}</div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 11, color: '#444', paddingTop: 8 }}>No data</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Ranked stats circles */}
+        <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #1f1f1f' }}>
+          <div style={{ fontSize: 10, color: '#ff6b35', fontWeight: 800, letterSpacing: '0.08em', marginBottom: 10 }}>SEASON RANKINGS <span style={{ color: '#444', fontWeight: 500 }}>vs all tournament teams</span></div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8 }}>
+            {stats.map(s => (
+              <CircleStat key={s.label} label={s.label} value={s.value} rank={s.rank} total={allTeams.length} color="#ff6b35" />
+            ))}
+          </div>
+        </div>
+
+        {/* Scout report */}
+        <div style={{ padding: '1rem 1.25rem' }}>
+          <div style={{ fontSize: 10, color: '#ff6b35', fontWeight: 800, letterSpacing: '0.08em', marginBottom: 10 }}>SCOUT REPORT</div>
+          {!scoutReport && !scoutLoading && (
+            <button onClick={generateScout} style={{
+              width: '100%', padding: '12px', fontSize: 13, fontWeight: 700,
+              background: 'linear-gradient(135deg, #ff6b35, #ff4500)',
+              border: 'none', borderRadius: 10, color: '#fff', cursor: 'pointer',
+              boxShadow: '0 4px 16px rgba(255,107,53,0.3)',
+            }}>
+              Generate Scout Report
+            </button>
+          )}
+          {scoutLoading && (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#555', fontStyle: 'italic', fontSize: 13 }}>
+              Generating front office memo...
+            </div>
+          )}
+          {scoutReport && (
+            <div style={{ fontSize: 13, lineHeight: 1.8, color: '#bbb' }}>
+              {scoutReport.split('\n').map((line, i) => {
+                const isBold = /^\*\*/.test(line);
+                const parsed = line.replace(/\*\*(.+?)\*\*/g, '<strong style="color:#f0f0f0;font-weight:800">$1</strong>');
+                if (!line.trim()) return <div key={i} style={{ height: 8 }} />;
+                return (
+                  <div key={i}
+                    style={{ marginBottom: isBold ? 4 : 3, fontSize: isBold ? 12 : 13 }}
                     dangerouslySetInnerHTML={{ __html: parsed }}
                   />
                 );
@@ -1338,38 +1504,41 @@ function BracketTab() {
     (g.away.won && parseInt(g.away.seed) > parseInt(g.home.seed) + 2)
   )).length;
 
-  if (loading) return <div style={{ textAlign: 'center', padding: '3rem', color: '#555' }}>Loading bracket...</div>;
+  if (loading) return <div style={{ textAlign: 'center', padding: '3rem', color: '#555', minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading bracket...</div>;
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 10, marginBottom: '1rem', flexWrap: 'wrap' }}>
-        <div style={{ background: '#1a1a1a', borderRadius: 10, padding: '10px 16px', border: '1px solid #2a2a2a', textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#22c55e' }}>{finalCount}</div>
-          <div style={{ fontSize: 10, color: '#777', letterSpacing: '0.06em' }}>COMPLETED</div>
-        </div>
-        <div style={{ background: '#1a1a1a', borderRadius: 10, padding: '10px 16px', border: '1px solid #2a2a2a', textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#ff3b30' }}>{liveCount}</div>
-          <div style={{ fontSize: 10, color: '#777', letterSpacing: '0.06em' }}>LIVE NOW</div>
-        </div>
-        <div style={{ background: '#1a1a1a', borderRadius: 10, padding: '10px 16px', border: '1px solid #2a2a2a', textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#ff6b35' }}>{upsetCount}</div>
-          <div style={{ fontSize: 10, color: '#777', letterSpacing: '0.06em' }}>UPSETS</div>
-        </div>
-        <div style={{ background: '#1a1a1a', borderRadius: 10, padding: '10px 16px', border: '1px solid #2a2a2a', textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#f0f0f0' }}>{roundAllGames.length}</div>
-          <div style={{ fontSize: 10, color: '#777', letterSpacing: '0.06em' }}>TOTAL GAMES</div>
-        </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: '1rem', marginTop: '0.5rem' }}>
+        {[
+          { value: finalCount, label: 'COMPLETED', color: '#22c55e' },
+          { value: liveCount, label: 'LIVE NOW', color: '#ff3b30' },
+          { value: upsetCount, label: 'UPSETS', color: '#ff6b35' },
+          { value: roundAllGames.length, label: 'TOTAL', color: '#888' },
+        ].map((s, i) => (
+          <div key={i} style={{
+            background: '#1a1a1a', borderRadius: 12,
+            padding: '12px 16px', flex: 1, textAlign: 'center',
+            border: `1px solid ${s.color}33`,
+            boxShadow: `0 0 12px ${s.color}11`,
+          }}>
+            <div style={{ fontSize: 22, fontWeight: 900, color: s.color, lineHeight: 1 }}>{s.value}</div>
+            <div style={{ fontSize: 9, color: '#555', letterSpacing: '0.08em', marginTop: 4, fontWeight: 700 }}>{s.label}</div>
+          </div>
+        ))}
       </div>
 
       <div style={{ display: 'flex', gap: 6, marginBottom: '1.25rem', flexWrap: 'wrap' }}>
         {rounds.map(r => (
           <button key={r} onClick={() => setActiveRound(r)} style={{
-            padding: '6px 14px', fontSize: 12, fontWeight: 700,
+            padding: '7px 16px', fontSize: 12, fontWeight: 700,
             borderRadius: 20, border: '1px solid',
-            borderColor: activeRound === r ? '#ff6b35' : '#2a2a2a',
-            background: activeRound === r ? '#ff6b35' : 'transparent',
-            color: activeRound === r ? '#fff' : '#666', cursor: 'pointer'
-          }}>{roundShort[r]}</button>
+            borderColor: activeRound === r ? '#ff6b35' : '#333',
+            background: activeRound === r ? '#ff6b35' : '#1a1a1a',
+            color: activeRound === r ? '#fff' : '#777', cursor: 'pointer'
+          }}
+            onMouseEnter={e => { if (activeRound !== r) e.currentTarget.style.borderColor = '#555'; }}
+            onMouseLeave={e => { if (activeRound !== r) e.currentTarget.style.borderColor = '#2a2a2a'; }}
+          >{roundShort[r]}</button>
         ))}
       </div>
 
@@ -1444,7 +1613,7 @@ function BracketTab() {
                   <BracketCountdown date={game.date} />
                 )}
                 {(game.isFinal || game.isLive) && (
-                  <span style={{ fontSize: 9, color: '#777' }}>tap for box score</span>
+                  <span style={{ fontSize: 9, color: '#ff6b35', fontWeight: 700, letterSpacing: '0.04em' }}>📊 stats</span>
                 )}
               </div>
             </div>
@@ -1545,6 +1714,233 @@ function BracketTab() {
   );
 }
 
+function EfficiencyTab() {
+  const [teams, setTeams] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [sortBy, setSortBy] = React.useState<string>('seed');
+  const [selectedTeam, setSelectedTeam] = React.useState<any>(null);
+  const [scoutReport, setScoutReport] = React.useState('');
+  const [scoutLoading, setScoutLoading] = React.useState(false);
+  const [search, setSearch] = React.useState('');
+  const [showEliminated, setShowEliminated] = React.useState(false);
+  const [eliminatedTeams, setEliminatedTeams] = React.useState<Set<string>>(new Set());
+  const [modalTeam, setModalTeam] = React.useState<any>(null);
+  const [leadersData, setLeadersData] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    fetch('/api/leaders').then(r => r.json()).then(d => setLeadersData(d)).catch(() => {});
+  }, []);
+
+  React.useEffect(() => {
+    fetch('/api/bracket').then(r => r.json()).then(d => {
+      const elim = new Set<string>();
+      d.games?.filter((g: any) => g.isFinal && g.home.name !== 'TBD').forEach((g: any) => {
+        const homeWon = parseInt(g.home.score) > parseInt(g.away.score);
+        const loser = homeWon ? g.away : g.home;
+        elim.add(loser.name);
+      });
+      setEliminatedTeams(elim);
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/efficiency')
+      .then(r => r.json())
+      .then(d => setTeams(d.teams || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function generateScoutReport(team: any) {
+    if (selectedTeam?.name === team.name) { setSelectedTeam(null); setScoutReport(''); return; }
+    setSelectedTeam(team);
+    setScoutReport('');
+    setScoutLoading(true);
+    try {
+      const res = await fetch('/api/efficiency', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ team }),
+      });
+      const data = await res.json();
+      setScoutReport(data.report || '');
+    } catch { }
+    setScoutLoading(false);
+  }
+
+  const columns = [
+    { key: 'seed', label: 'SEED', width: 44 },
+    { key: 'tsPct', label: 'TS%', width: 54 },
+    { key: 'ppg', label: 'PPG', width: 54 },
+    { key: 'fgPct', label: 'FG%', width: 54 },
+    { key: 'threePct', label: '3P%', width: 54 },
+    { key: 'reb', label: 'REB', width: 54 },
+    { key: 'astTo', label: 'A/TO', width: 54 },
+  ];
+
+  const sorted = [...teams]
+    .filter(t => search === '' || t.name.toLowerCase().includes(search.toLowerCase()) || t.shortName?.toLowerCase().includes(search.toLowerCase()))
+    .filter(t => showEliminated || !eliminatedTeams.has(t.name))
+    .sort((a, b) => {
+      if (sortBy === 'seed') return a.seed - b.seed;
+      return (b[sortBy] as number) - (a[sortBy] as number);
+    });
+
+  function statColor(key: string, value: number, allValues: number[]): string {
+    if (!allValues.length) return '#aaa';
+    const min = Math.min(...allValues);
+    const max = Math.max(...allValues);
+    const pct = max === min ? 0.5 : (value - min) / (max - min);
+    if (key === 'seed') return '#aaa';
+    if (pct >= 0.75) return '#22c55e';
+    if (pct >= 0.5) return '#f0f0f0';
+    if (pct >= 0.25) return '#ff9500';
+    return '#ff3b30';
+  }
+
+  if (loading) return (
+    <div style={{ textAlign: 'center', padding: '3rem', color: '#555' }}>
+      <div style={{ fontSize: 24, marginBottom: 12 }}>📊</div>
+      Loading efficiency data...
+    </div>
+  );
+
+  return (
+    <div>
+      <div style={{ marginBottom: '1rem', padding: '12px 16px', background: '#1a1a1a', borderRadius: 10, border: '1px solid #2a2a2a' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <div style={{ fontSize: 11, color: '#ff6b35', fontWeight: 800, letterSpacing: '0.06em' }}>📊 EFFICIENCY DASHBOARD</div>
+          <div style={{ fontSize: 10, color: '#555', fontWeight: 700, background: '#2a2a2a', padding: '2px 8px', borderRadius: 10, letterSpacing: '0.04em' }}>
+            FULL SEASON AVERAGES
+          </div>
+        </div>
+        <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>
+          All teams sorted by advanced metrics. Tap a column to sort. Tap a team for a Claude scouting report.
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, marginBottom: 12, alignItems: 'center' }}>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search teams..."
+          style={{
+            flex: 1, fontSize: 14, padding: '11px 16px',
+            border: '1px solid #2a2a2a', borderRadius: 10,
+            background: '#1a1a1a', color: '#f0f0f0',
+            outline: 'none',
+          }}
+        />
+        <div
+          onClick={() => setShowEliminated(h => !h)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 7,
+            fontSize: 12, fontWeight: 600, color: '#aaa',
+            cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+          }}>
+          <div style={{
+            width: 18, height: 18, borderRadius: 4,
+            border: `2px solid ${showEliminated ? '#ff6b35' : '#444'}`,
+            background: showEliminated ? '#ff6b35' : 'transparent',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'all 0.15s', flexShrink: 0,
+          }}>
+            {showEliminated && <span style={{ fontSize: 11, color: '#fff', fontWeight: 800 }}>✓</span>}
+          </div>
+          Show eliminated
+        </div>
+      </div>
+
+      <div style={{ fontSize: 10, color: '#666', marginBottom: 8, textAlign: 'right', letterSpacing: '0.04em', fontWeight: 600 }}>
+        📅 Full 2025–26 season averages
+      </div>
+
+      {/* Sortable column headers */}
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid #2a2a2a' }}>
+              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#555', fontWeight: 700, fontSize: 10, letterSpacing: '0.06em', minWidth: 120 }}>TEAM</th>
+              {columns.map(col => (
+                <th
+                  key={col.key}
+                  onClick={() => setSortBy(col.key)}
+                  style={{
+                    padding: '8px 6px', textAlign: 'center',
+                    color: sortBy === col.key ? '#ff6b35' : '#555',
+                    fontWeight: 700, fontSize: 10, letterSpacing: '0.06em',
+                    cursor: 'pointer', width: col.width, whiteSpace: 'nowrap',
+                    borderBottom: sortBy === col.key ? '2px solid #ff6b35' : '2px solid transparent',
+                    transition: 'color 0.15s',
+                  }}>
+                  {col.label} {sortBy === col.key ? '↓' : ''}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((team: any) => {
+              const isSelected = selectedTeam?.name === team.name;
+              return (
+                <React.Fragment key={team.name}>
+                  <tr
+                    onClick={() => setModalTeam(team)}
+                    style={{
+                      borderBottom: '1px solid #1f1f1f',
+                      cursor: 'pointer',
+                      background: isSelected ? '#1f2a1f' : 'transparent',
+                      transition: 'background 0.15s',
+                    }}
+                    onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = '#222'; }}
+                    onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                  >
+                    <td style={{ padding: '12px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {team.logo && (
+                        <img src={team.logo} alt="" style={{ width: 20, height: 20, objectFit: 'contain', flexShrink: 0 }}
+                          onError={(e) => (e.currentTarget.style.display = 'none')} />
+                      )}
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+                        <span style={{ fontSize: 12, fontWeight: isSelected ? 700 : 500, color: isSelected ? '#f0f0f0' : '#ccc', whiteSpace: 'nowrap' }}>
+                          {team.shortName}
+                        </span>
+                        {team.gamesPlayed > 0 && (
+                          <span style={{ fontSize: 10, color: '#444', fontWeight: 600 }}>
+                            ({team.gamesPlayed}G)
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    {columns.map(col => {
+                      const allVals = sorted.map((t: any) => t[col.key]).filter((v: any) => typeof v === 'number');
+                      const color = statColor(col.key, team[col.key], allVals);
+                      return (
+                        <td key={col.key} style={{ padding: '10px 6px', textAlign: 'center', color, fontWeight: col.key === sortBy ? 700 : 400 }}>
+                          {col.key === 'tsPct' || col.key === 'fgPct' || col.key === 'threePct'
+                            ? `${team[col.key]}%`
+                            : team[col.key]}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                  
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {modalTeam && (
+        <TeamDetailModal
+          team={modalTeam}
+          allTeams={teams}
+          leaders={leadersData}
+          onClose={() => setModalTeam(null)}
+        />
+      )}
+    </div>
+  );
+}
+
 function BracketBustersTab() {
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
@@ -1555,7 +1951,7 @@ function BracketBustersTab() {
   }, []);
 
   if (loading) return (
-    <div style={{ textAlign: 'center', padding: '3rem', color: '#555' }}>
+    <div style={{ textAlign: 'center', padding: '3rem', color: '#555', minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ fontSize: 24, marginBottom: 12 }}>🔮</div>
       Calculating bracket chaos...
     </div>
@@ -1564,7 +1960,7 @@ function BracketBustersTab() {
   const teams = data?.teams || [];
 
   if (teams.length === 0) return (
-    <div style={{ textAlign: 'center', padding: '3rem', color: '#555', fontSize: 13 }}>
+    <div style={{ textAlign: 'center', padding: '3rem', color: '#555', fontSize: 13, minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       No bracket busters yet. Check back as upsets happen.
     </div>
   );
@@ -1580,8 +1976,8 @@ function BracketBustersTab() {
           <button key={t.key} onClick={() => setActiveSubTab(t.key)} style={{
             padding: '7px 16px', fontSize: 12, fontWeight: 700,
             borderRadius: 20, border: '1px solid',
-            borderColor: activeSubTab === t.key ? '#ff6b35' : '#2a2a2a',
-            background: activeSubTab === t.key ? '#ff6b35' : 'transparent',
+            borderColor: activeSubTab === t.key ? '#ff6b35' : '#333',
+            background: activeSubTab === t.key ? '#ff6b35' : '#1a1a1a',
             color: activeSubTab === t.key ? '#fff' : '#888',
             cursor: 'pointer',
           }}>{t.label}</button>
@@ -1671,9 +2067,8 @@ function BracketBustersTab() {
               {/* Claude narrative */}
               {team.narrative && (
                 <div style={{
-                  marginTop: 10, fontSize: 12, color: '#bbb',
-                  lineHeight: 1.7, borderTop: '1px solid #222', paddingTop: 10,
-                  fontStyle: 'italic',
+                  marginTop: 10, fontSize: 12, color: '#ccc',
+                  lineHeight: 1.8, borderTop: '1px solid #2a2a2a', paddingTop: 10,
                 }}>
                   {team.narrative}
                 </div>
@@ -1939,7 +2334,7 @@ function LeadersTab() {
     { key: 'blocks', label: '🛡 Blocks', statKey: 'bpg', statLabel: 'BPG' },
   ];
 
-  if (loading) return <div style={{ textAlign: 'center', padding: '3rem', color: '#555' }}>Loading leaders...</div>;
+  if (loading) return <div style={{ textAlign: 'center', padding: '3rem', color: '#555', minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading leaders...</div>;
   if (!data) return <div style={{ textAlign: 'center', padding: '3rem', color: '#555' }}>No data available.</div>;
 
   const activeCat = categories.find(c => c.key === activeCategory)!;
@@ -1956,11 +2351,11 @@ function LeadersTab() {
       <div style={{ display: 'flex', gap: 6, marginBottom: '1.25rem', flexWrap: 'wrap' }}>
         {categories.map(c => (
           <button key={c.key} onClick={() => { setActiveCategory(c.key); setSearch(''); setPage(1); }} style={{
-            padding: '6px 12px', fontSize: 11, fontWeight: 700,
+            padding: '7px 14px', fontSize: 12, fontWeight: 700,
             borderRadius: 20, border: '1px solid',
-            borderColor: activeCategory === c.key ? '#ff6b35' : '#2a2a2a',
-            background: activeCategory === c.key ? '#ff6b35' : 'transparent',
-            color: activeCategory === c.key ? '#fff' : '#666', cursor: 'pointer'
+            borderColor: activeCategory === c.key ? '#ff6b35' : '#333',
+            background: activeCategory === c.key ? '#ff6b35' : '#1a1a1a',
+            color: activeCategory === c.key ? '#fff' : '#777', cursor: 'pointer'
           }}>{c.label}</button>
         ))}
       </div>
@@ -1973,7 +2368,7 @@ function LeadersTab() {
           width: '100%', fontSize: 14, padding: '11px 16px',
           border: '1px solid #2a2a2a', borderRadius: 10,
           background: '#1a1a1a', color: '#f0f0f0',
-          marginBottom: 12, outline: 'none'
+          marginBottom: 12, outline: 'none', transition: 'border-color 0.2s',
         }}
       />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1991,9 +2386,10 @@ function LeadersTab() {
               display: 'flex',
               alignItems: 'center',
               gap: 12,
-              borderLeft: isTop3 ? `4px solid ${i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : '#CD7F32'}` : '4px solid #2a2a2a',
+              borderLeft: isTop3 ? `4px solid ${i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : '#CD7F32'}` : '4px solid transparent',
+              boxShadow: i === 0 ? '0 0 20px rgba(255,215,0,0.08)' : 'none',
             }}>
-              <div style={{ fontSize: 16, fontWeight: 800, color: i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : '#444', width: 24, textAlign: 'center', flexShrink: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : '#555', width: 28, textAlign: 'center', flexShrink: 0 }}>
                 {i + 1}
               </div>
 
@@ -2114,7 +2510,7 @@ export default function Home() {
   const [gamesLoading, setGamesLoading] = useState(true);
   const [playersLoading, setPlayersLoading] = useState(true);
   
-  const [activeTab, setActiveTab] = useState<'games' | 'players' | 'bracket' | 'upsets' | 'leaders'>('games');
+  const [activeTab, setActiveTab] = useState<'games' | 'players' | 'bracket' | 'upsets' | 'leaders' | 'efficiency'>('games');
   const [gameFilter, setGameFilter] = useState<'all' | 'live' | 'final' | 'upcoming'>('all');
   const [nilPlayer, setNilPlayer] = useState<Player | null>(null);
   const [gameSearch, setGameSearch] = useState('');
@@ -2192,29 +2588,40 @@ export default function Home() {
   const liveCount = games.filter(g => g.isLive).length;
 
   return (
-    <main style={{ background: '#0f0f0f', minHeight: '100vh', padding: '1.5rem 1.25rem', maxWidth: 680, margin: '0 auto', paddingTop: '3.5rem' }}>
+    <main style={{ background: 'radial-gradient(ellipse at top, #1a0f0a 0%, #0f0f0f 60%)', minHeight: '100vh', padding: '1.5rem 1.25rem', maxWidth: 680, margin: '0 auto', paddingTop: '3.5rem' }}>
       <style>{`
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
         @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-33.333%); } }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+        @keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         * { box-sizing: border-box; }
       `}</style>
       <ScoreTicker games={games} />
 
       <div style={{ marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 6 }}>
-          <h1 style={{ fontSize: 26, fontWeight: 900, color: '#f0f0f0', letterSpacing: '-0.5px' }}>
-            March Madness
+          <h1 style={{
+          fontSize: 28, fontWeight: 900, letterSpacing: '-1px',
+          background: 'linear-gradient(135deg, #ffffff 0%, #ff6b35 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+        }}>
+            MadnessHQ
           </h1>
           <span style={{
-            fontSize: 12, color: '#ff6b35', fontWeight: 800,
-            background: '#ff6b3522', padding: '2px 8px',
-            borderRadius: 6, letterSpacing: '0.05em'
-          }}>STORY ENGINE</span>
+            fontSize: 11, color: '#fff', fontWeight: 800,
+            background: 'linear-gradient(135deg, #ff6b35, #ff3b30)',
+            padding: '3px 8px', borderRadius: 6,
+            letterSpacing: '0.1em', boxShadow: '0 2px 8px rgba(255,107,53,0.4)',
+            animation: 'pulse 2s infinite',
+          }}>● LIVE</span>
         </div>
-        <p style={{ fontSize: 12, color: '#777' }}>Live games · AI narratives · Cinderella tracker · NIL spotlight</p>
+        <p style={{ fontSize: 12, color: '#555' }}>Live scores · Bracket · Cinderella · NIL · AI analyst</p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           {liveCount > 0 && (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#22c55e18', padding: '4px 10px', borderRadius: 20, border: '1px solid #22c55e33' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#22c55e18', padding: '4px 10px', borderRadius: 20, border: '1px solid #22c55e44', boxShadow: '0 0 12px rgba(34,197,94,0.15)' }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', animation: 'pulse 1.5s infinite' }} />
               <span style={{ fontSize: 11, color: '#22c55e', fontWeight: 700 }}>{liveCount} game{liveCount > 1 ? 's' : ''} live now</span>
             </div>
@@ -2248,23 +2655,49 @@ export default function Home() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 4, marginBottom: '1.25rem', background: '#1a1a1a', borderRadius: 12, padding: 4, border: '1px solid #2a2a2a' }}>
-        {(['games', 'players', 'bracket', 'upsets', 'leaders'] as const).map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)} style={{
-            flex: 1, padding: '10px 8px', fontSize: 13, fontWeight: 700,
-            background: activeTab === tab ? '#ff6b35' : 'transparent',
-            border: 'none', borderRadius: 9,
-            color: activeTab === tab ? '#fff' : '#888',
-            cursor: 'pointer', transition: 'all 0.15s',
-            letterSpacing: '0.02em'
-          }}>
-            {tab === 'games' ? '📊 Scores' : tab === 'players' ? '⭐ Cinderella' : tab === 'bracket' ? '🗓 Bracket' : tab === 'upsets' ? '🔮 Busters' : '🏆 Leaders'}
+      <div style={{
+        display: 'flex', gap: 2, marginBottom: '1.25rem',
+        background: '#141414', borderRadius: 14, padding: 5,
+        border: '1px solid #222', boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
+        width: '100%', boxSizing: 'border-box',
+      }}>
+        {([
+          { key: 'games', label: 'Scores' },
+          { key: 'bracket', label: 'Bracket' },
+          { key: 'leaders', label: 'Players' },
+          { key: 'efficiency', label: 'Teams' },
+          { key: 'upsets', label: 'Busters' },
+          { key: 'players', label: 'Cinderella' },
+        ] as const).map(({ key, label }) => (
+          <button key={key} onClick={() => setActiveTab(key)} style={{
+            flex: '1 1 0',
+            minWidth: 0,
+            padding: '9px 2px',
+            fontSize: 12,
+            fontWeight: activeTab === key ? 700 : 600,
+            background: activeTab === key
+              ? 'linear-gradient(135deg, #ff6b35, #ff4500)'
+              : 'transparent',
+            border: 'none',
+            borderRadius: 10,
+            color: activeTab === key ? '#fff' : '#555',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            boxShadow: activeTab === key ? '0 2px 12px rgba(255,107,53,0.35)' : 'none',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+            onMouseEnter={e => { if (activeTab !== key) e.currentTarget.style.color = '#aaa'; }}
+            onMouseLeave={e => { if (activeTab !== key) e.currentTarget.style.color = '#555'; }}
+          >
+            {label}
           </button>
         ))}
       </div>
 
       {activeTab === 'games' && (
-        <>
+        <div style={{ minHeight: '70vh' }}>
           <input
             value={gameSearch}
             onChange={e => setGameSearch(e.target.value)}
@@ -2273,8 +2706,11 @@ export default function Home() {
               width: '100%', fontSize: 14, padding: '11px 16px',
               border: '1px solid #2a2a2a', borderRadius: 10,
               background: '#1a1a1a', color: '#f0f0f0',
-              marginBottom: 12, outline: 'none'
+              marginBottom: 12, outline: 'none',
+              transition: 'border-color 0.2s',
             }}
+            onFocus={e => e.currentTarget.style.borderColor = '#ff6b35'}
+            onBlur={e => e.currentTarget.style.borderColor = '#333'}
           />
           <div style={{ display: 'flex', gap: 8, marginBottom: '1.25rem', flexWrap: 'wrap' }}>
             {(['all', 'live', 'final', 'upcoming'] as const).map(f => (
@@ -2297,6 +2733,43 @@ export default function Home() {
             ))}
           </div>
           {gamesLoading && <div style={{ textAlign: 'center', padding: '3rem', color: '#555' }}>Loading games...</div>}
+          {!gamesLoading && games.length > 0 && games.filter(g => g.isLive).length === 0 && gameFilter === 'live' && (() => {
+            const nextGame = [...games].filter(g => !g.isFinal && !g.isLive).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
+            const minsUntil = nextGame ? Math.max(0, Math.round((new Date(nextGame.date).getTime() - Date.now()) / 60000)) : null;
+            return (
+              <div style={{ textAlign: 'center', padding: '3rem 1rem', minHeight: '40vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ fontSize: 40, marginBottom: 16 }}>🏀</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: '#f0f0f0', marginBottom: 8 }}>No games live right now</div>
+                {nextGame && minsUntil !== null && (
+                  <>
+                    <div style={{ fontSize: 13, color: '#555', marginBottom: 20 }}>
+                      Next tip-off in <span style={{ color: '#ff6b35', fontWeight: 700 }}>{minsUntil >= 60 ? `${Math.floor(minsUntil / 60)}h ${minsUntil % 60}m` : `${minsUntil}m`}</span>
+                    </div>
+                    <div style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 14, padding: '1rem 1.5rem', maxWidth: 320, width: '100%' }}>
+                      <div style={{ fontSize: 10, color: '#ff6b35', fontWeight: 800, letterSpacing: '0.08em', marginBottom: 10 }}>UP NEXT</div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                        <div style={{ textAlign: 'center', flex: 1 }}>
+                          {nextGame.away.logo && <img src={nextGame.away.logo} alt="" style={{ width: 32, height: 32, objectFit: 'contain', marginBottom: 4 }} />}
+                          <div style={{ fontSize: 10, color: '#666' }}>#{nextGame.away.seed}</div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: '#f0f0f0' }}>{nextGame.away.name.split(' ').slice(-1)[0]}</div>
+                        </div>
+                        <div style={{ fontSize: 13, color: '#444', fontWeight: 800 }}>VS</div>
+                        <div style={{ textAlign: 'center', flex: 1 }}>
+                          {nextGame.home.logo && <img src={nextGame.home.logo} alt="" style={{ width: 32, height: 32, objectFit: 'contain', marginBottom: 4 }} />}
+                          <div style={{ fontSize: 10, color: '#666' }}>#{nextGame.home.seed}</div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: '#f0f0f0' }}>{nextGame.home.name.split(' ').slice(-1)[0]}</div>
+                        </div>
+                      </div>
+                      <div style={{ marginTop: 10, fontSize: 11, color: '#555', textAlign: 'center' }}>{nextGame.time} · {nextGame.venue?.split(' ').slice(0, 3).join(' ')}</div>
+                    </div>
+                  </>
+                )}
+                <button onClick={() => setGameFilter('all')} style={{ marginTop: 20, padding: '8px 20px', fontSize: 12, fontWeight: 700, background: 'transparent', border: '1px solid #333', borderRadius: 20, color: '#888', cursor: 'pointer' }}>
+                  View all games →
+                </button>
+              </div>
+            );
+          })()}
           {(() => {
             // Build all groups first
             const allGroups: { label: string; dateKey: string; games: typeof filteredGames }[] = [];
@@ -2507,11 +2980,11 @@ export default function Home() {
               </>
             );
           })()}
-        </>
+        </div>
       )}
 
       {activeTab === 'players' && (
-        <>
+        <div style={{ minHeight: '70vh' }}>
           <input
             value={playerSearch}
             onChange={e => setPlayerSearch(e.target.value)}
@@ -2523,7 +2996,7 @@ export default function Home() {
               marginBottom: 12, outline: 'none'
             }}
           />
-          <div style={{ marginBottom: '1rem', padding: '12px 16px', background: '#1a1a1a', borderRadius: 10, border: '1px solid #2a2a2a' }}>
+          <div style={{ marginBottom: '1rem', padding: '12px 16px', background: '#1a1a1a', borderRadius: 10, border: '1px solid #ff6b3530', borderLeft: '3px solid #ff6b35' }}>
             <div style={{ fontSize: 11, color: '#ff6b35', fontWeight: 800, marginBottom: 4, letterSpacing: '0.06em' }}>CINDERELLA SCORE</div>
             <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>
               Players from upset wins ranked by performance + upset factor + underdog narrative. Click NIL ↗ for AI social buzz score and market valuation.
@@ -2534,15 +3007,29 @@ export default function Home() {
             <div style={{ textAlign: 'center', padding: '3rem', color: '#555' }}>No upset players found yet. Check back as games finish.</div>
           )}
           {filteredPlayers.map(player => <PlayerCard key={player.id} player={player} onNIL={setNilPlayer} />)}
-        </>
+        </div>
       )}
 
-      <div style={{ textAlign: 'center', marginTop: '2rem', fontSize: 11, color: '#333' }}>
-        Updates every 60 seconds · ESPN + Claude AI
+      <div style={{
+        textAlign: 'center', marginTop: '2rem', paddingTop: '1rem',
+        borderTop: '1px solid #1f1f1f',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+      }}>
+        <span style={{ fontSize: 10, color: '#333', fontWeight: 600, letterSpacing: '0.06em' }}>
+          MADNESSHQ
+        </span>
+        <span style={{ color: '#2a2a2a' }}>·</span>
+        <span style={{ fontSize: 10, color: '#2a2a2a' }}>ESPN + Claude AI</span>
+        <span style={{ color: '#2a2a2a' }}>·</span>
+        <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#22c55e', animation: 'pulse 1.5s infinite' }} />
+        <span style={{ fontSize: 10, color: '#2a2a2a' }}>Live</span>
       </div>
-      {activeTab === 'bracket' && <BracketTab />}
-      {activeTab === 'upsets' && <BracketBustersTab />}
-      {activeTab === 'leaders' && <LeadersTab />}
+      <div style={{ minHeight: '70vh', width: '100%' }}>
+        {activeTab === 'bracket' && <BracketTab />}
+        {activeTab === 'upsets' && <BracketBustersTab />}
+        {activeTab === 'efficiency' && <EfficiencyTab />}
+        {activeTab === 'leaders' && <LeadersTab />}
+      </div>
       {nilPlayer && <NILModal player={nilPlayer} onClose={() => setNilPlayer(null)} />}
       <TournamentChat games={games} players={players} />
     </main>

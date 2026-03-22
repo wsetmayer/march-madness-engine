@@ -61,6 +61,7 @@ export async function GET() {
           seed: home?.curatedRank?.current || null,
           score: home?.score || '0',
           won: homeWon,
+          id: home?.team?.id || null,
         },
         away: {
           name: away?.team?.displayName || 'TBD',
@@ -70,6 +71,7 @@ export async function GET() {
           seed: away?.curatedRank?.current || null,
           score: away?.score || '0',
           won: awayWon,
+          id: away?.team?.id || null,
         },
         venue: comp.venue?.fullName || '',
         city,

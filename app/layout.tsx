@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "March Madness Story Engine",
+  title: '🏀 MadnessHQ',
   description: "Live scores, AI narratives, Cinderella tracker, NIL spotlight — March Madness 2026 powered by ESPN + Claude AI.",
   openGraph: {
     title: "March Madness Story Engine",
