@@ -76,17 +76,14 @@ export async function GET() {
         venue: comp.venue?.fullName || '',
         city,
         round: (() => {
-          const d = new Date(event.date);
-          const month = d.getUTCMonth() + 1;
-          const day = d.getUTCDate();
-          if (venueName === 'UD Arena') return 'Round of 68';
-          if (month === 3 && (day === 19 || day === 20)) return 'Round of 64';
-          if (month === 3 && day === 21 && d.getUTCHours() < 14) return 'Round of 64';
-          if (month === 3 && (day === 21 || day === 22)) return 'Round of 32';
-          if (month === 3 && (day === 27 || day === 28)) return 'Sweet 16';
-          if (month === 3 && (day === 29 || day === 30)) return 'Elite 8';
-          if (month === 4 && day === 4) return 'Final Four';
-          if (month === 4 && day === 6) return 'Championship';
+          const headline = comp.notes?.[0]?.headline?.toLowerCase() || '';
+          if (headline.includes('first four') || venueName === 'UD Arena') return 'Round of 68';
+          if (headline.includes('1st round') || headline.includes('first round')) return 'Round of 64';
+          if (headline.includes('2nd round') || headline.includes('second round')) return 'Round of 32';
+          if (headline.includes('sweet 16') || headline.includes('sweet sixteen') || headline.includes('regional semifinal')) return 'Sweet 16';
+          if (headline.includes('elite eight') || headline.includes('elite 8') || headline.includes('regional final')) return 'Elite 8';
+          if (headline.includes('final four') || headline.includes('national semifinal')) return 'Final Four';
+          if (headline.includes('championship') || headline.includes('national championship')) return 'Championship';
           return 'Round of 64';
         })(),
       };
