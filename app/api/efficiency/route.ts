@@ -51,7 +51,7 @@ async function getTeamStats(teamId: string) {
 export async function GET() {
   try {
     const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
+      ? `https://march-madness-engine.vercel.app`
       : 'http://localhost:3000';
 
     const bracketRes = await fetch(`${baseUrl}/api/bracket`, { next: { revalidate: 60 } });
